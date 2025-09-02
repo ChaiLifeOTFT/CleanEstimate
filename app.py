@@ -1,12 +1,21 @@
 import os
 import logging
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from werkzeug.utils import secure_filename
 import uuid
 import json
 import sys
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
+import qrcode
+from io import BytesIO
+import base64
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -203,6 +212,27 @@ def save_uploaded_file(file):
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
         return filename
     return None
+
+def generate_qr_code(url):
+    """Generate QR code for a URL and return as base64 string"""
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # Convert to base64
+    buffer = BytesIO()
+    img.save(buffer, format='PNG')
+    buffer.seek(0)
+    img_str = base64.b64encode(buffer.getvalue()).decode()
+    
+    return f"data:image/png;base64,{img_str}"
 
 def calculate_task_times(cleaning_type, square_footage):
     """Calculate estimated time for each task based on square footage"""
@@ -678,6 +708,17 @@ def job_complete():
         return redirect(url_for('index'))
     
     job_data = session['job_data']
+    
+    # Generate unique job ID if not exists
+    if 'job_id' not in job_data:
+        job_data['job_id'] = str(uuid.uuid4())[:8]
+        session['job_data'] = job_data
+    
+    # Generate QR code for the report URL
+    report_url = request.url_root + f"report/{job_data['job_id']}"
+    job_data['qr_code'] = generate_qr_code(report_url)
+    job_data['report_url'] = report_url
+    
     return render_template('job_complete.html', job_data=job_data)
 
 @app.route('/performance')
@@ -806,6 +847,141 @@ def performance():
                          actual_times=actual_times,
                          time_distribution=time_distribution,
                          task_breakdown=task_breakdown)
+
+@app.route('/report/<job_id>')
+def view_report(job_id):
+    """View a job report by ID"""
+    # In production, this would fetch from database
+    # For now, check if it's the current session's job
+    if 'job_data' in session and session.get('job_data', {}).get('job_id') == job_id:
+        job_data = session['job_data']
+        return render_template('job_complete.html', job_data=job_data, public_view=True)
+    else:
+        flash('Report not found or has expired.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/download_pdf/<job_id>')
+def download_pdf(job_id):
+    """Generate and download PDF report"""
+    if 'job_data' not in session or session.get('job_data', {}).get('job_id') != job_id:
+        flash('Report not found.', 'error')
+        return redirect(url_for('index'))
+    
+    job_data = session['job_data']
+    
+    # Create PDF in memory
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    
+    # Container for the 'Flowable' objects
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor('#2c3e50'),
+        alignment=TA_CENTER,
+        spaceAfter=30
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=16,
+        textColor=colors.HexColor('#34495e'),
+        spaceAfter=12
+    )
+    
+    # Title
+    elements.append(Paragraph("Drake's Precision Cleaning", title_style))
+    elements.append(Paragraph("Job Completion Report", styles['Title']))
+    elements.append(Spacer(1, 12))
+    
+    # Job Information
+    elements.append(Paragraph("Job Information", heading_style))
+    
+    job_info_data = [
+        ['Client Name:', job_data.get('client_name', 'N/A')],
+        ['Cleaner Name:', job_data.get('cleaner_name', 'N/A')],
+        ['Job Address:', job_data.get('job_address', 'N/A')],
+        ['Lot Number:', job_data.get('lot_number', 'N/A') if job_data.get('lot_number') else 'N/A'],
+        ['Square Footage:', f"{job_data.get('square_footage', 0):,} sq ft"],
+        ['Cleaning Type:', job_data.get('cleaning_type', 'N/A')],
+        ['Total Est. Time:', f"{job_data.get('total_estimated_hours', 0)} hours ({job_data.get('total_estimated_minutes', 0)} minutes)"]
+    ]
+    
+    job_table = Table(job_info_data, colWidths=[2*inch, 4*inch])
+    job_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+        ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    
+    elements.append(job_table)
+    elements.append(Spacer(1, 20))
+    
+    # Completed Tasks
+    elements.append(Paragraph("Completed Tasks", heading_style))
+    
+    if job_data.get('completed_tasks'):
+        for i, task in enumerate(job_data['completed_tasks'], 1):
+            task_text = f"<b>{i}. {task.get('task_name', 'Unknown Task')}</b>"
+            if task.get('actual_minutes'):
+                task_text += f" - Completed in {task.get('actual_minutes', 0):.0f} minutes"
+            elements.append(Paragraph(task_text, styles['Normal']))
+            
+            if task.get('exceptions'):
+                for exc in task['exceptions']:
+                    exc_text = f"   • Exception: {exc.get('issue_type', '')} - {exc.get('description', '')}"
+                    elements.append(Paragraph(exc_text, styles['Normal']))
+            
+            elements.append(Spacer(1, 6))
+    
+    elements.append(Spacer(1, 20))
+    
+    # Exceptions Summary
+    all_exceptions = []
+    for task in job_data.get('completed_tasks', []):
+        for exc in task.get('exceptions', []):
+            all_exceptions.append(exc)
+    
+    if all_exceptions:
+        elements.append(Paragraph("Exceptions/Issues", heading_style))
+        for exc in all_exceptions:
+            exc_text = f"<b>{exc.get('issue_type', '')}</b>: {exc.get('description', '')}"
+            if exc.get('recommended_action'):
+                exc_text += f"<br/>Recommended Action: {exc.get('recommended_action', '')}"
+            elements.append(Paragraph(exc_text, styles['Normal']))
+            elements.append(Spacer(1, 6))
+    
+    # Footer
+    elements.append(Spacer(1, 30))
+    footer_text = f"Report generated on {job_data.get('completion_date', 'N/A')}<br/>"
+    footer_text += "Drake's Precision Cleaning - Professional Construction Cleaning Services"
+    elements.append(Paragraph(footer_text, styles['Normal']))
+    
+    # Build PDF
+    doc.build(elements)
+    
+    # Prepare response
+    buffer.seek(0)
+    filename = f"cleaning_report_{job_data.get('client_name', 'unknown').replace(' ', '_')}_{job_id}.pdf"
+    
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/pdf'
+    )
 
 @app.route('/submitted')
 def submitted():

@@ -540,6 +540,68 @@
         </div>
         {% endif %}
 
+        <!-- QR Code & PDF Export Section -->
+        <div class="row mb-4">
+            <div class="col-lg-6 mb-3">
+                <div class="card border-info">
+                    <div class="card-header bg-info bg-opacity-10">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-qrcode me-2"></i>
+                            Quick Access QR Code
+                        </h3>
+                    </div>
+                    <div class="card-body text-center">
+                        {% if job_data.qr_code %}
+                        <img src="{{ job_data.qr_code }}" alt="QR Code" style="max-width: 250px;">
+                        <div class="mt-3">
+                            <p class="mb-2"><strong>Scan to View Report</strong></p>
+                            <small class="text-muted">
+                                Share this QR code with builders or clients for instant mobile access
+                            </small>
+                            <div class="mt-2">
+                                <code style="font-size: 0.8rem;">{{ job_data.report_url }}</code>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-6 mb-3">
+                <div class="card border-secondary">
+                    <div class="card-header bg-secondary bg-opacity-10">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-file-pdf me-2"></i>
+                            Export Options
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3">Generate professional PDF reports for printing, archiving, or email attachment.</p>
+                        
+                        {% if job_data.job_id %}
+                        <a href="{{ url_for('download_pdf', job_id=job_data.job_id) }}" 
+                           class="btn btn-danger btn-lg w-100 mb-3">
+                            <i class="fas fa-download me-2"></i>
+                            Download PDF Report
+                        </a>
+                        {% endif %}
+                        
+                        <button onclick="window.print()" class="btn btn-outline-secondary w-100">
+                            <i class="fas fa-print me-2"></i>
+                            Print This Page
+                        </button>
+                        
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                PDF includes all job details, completed tasks, and exception reports
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Email Report Section -->
         <div class="row mb-4">
             <div class="col-12">
