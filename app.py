@@ -21,48 +21,99 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 # Ensure upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Task library with cleaning tasks and time estimates
+# Task library with cleaning tasks and time estimates based on ResiBuilt specifications
 task_library = {
+    "Rough Clean": [
+        {
+            "task": "Clean all tubs and shower pans",
+            "time_per_100": 1.2,
+            "instructions": "Clean all tubs and shower pans thoroughly. Use appropriate cleaners that will not scratch, chip, or mar the surfaces. Remove all construction debris and residue."
+        },
+        {
+            "task": "Clean window frames inside and outside",
+            "time_per_100": 1.5,
+            "instructions": "Clean all window frames both inside and outside, using care not to scratch frames. Use proper cleaning materials and techniques to avoid damage."
+        },
+        {
+            "task": "Clean sliding glass door frames and panels",
+            "time_per_100": 1.0,
+            "instructions": "Clean sliding glass door frames and glass panels. Ensure all glass is left free of streaks and spots by using proper cleaning materials."
+        },
+        {
+            "task": "Clean and vacuum window and door tracks",
+            "time_per_100": 0.8,
+            "instructions": "All window frames and sliding glass door tracks will be brushed clean and vacuumed. Remove all debris and construction materials from tracks."
+        },
+        {
+            "task": "Clean cabinets and vanities inside and outside",
+            "time_per_100": 2.0,
+            "instructions": "All cabinets and vanities will be cleaned inside and outside. Interior should be vacuumed and washed or wiped clean. Use cleaner that will not scratch or mar doors, cabinets, or countertops. Clean tops of cabinets."
+        },
+        {
+            "task": "Clean all drawers",
+            "time_per_100": 0.6,
+            "instructions": "All drawers will be vacuumed clean and wiped clean. Remove all construction debris and dust from drawer interiors."
+        },
+        {
+            "task": "Clean closet shelves",
+            "time_per_100": 0.4,
+            "instructions": "All closet shelves to be wiped clean. Remove dust and construction debris from all shelf surfaces."
+        },
+        {
+            "task": "Clean interior and exterior doors",
+            "time_per_100": 1.0,
+            "instructions": "All interior and exterior doors will be cleaned, including door knobs, lock sets and thresholds. Remove excess residue on hardware and thresholds (paint or joint compound) using appropriate cleaning agents."
+        },
+        {
+            "task": "Clean electrical fixtures and appliances",
+            "time_per_100": 1.2,
+            "instructions": "All electrical fixtures, exposed light bulbs and appliances will be cleaned. Use appropriate cleaners and techniques to avoid damage to electrical components."
+        },
+        {
+            "task": "Clean plumbing fixtures",
+            "time_per_100": 1.5,
+            "instructions": "All plumbing fixtures, including tubs, sinks and water closets, will be cleaned in a manner that will protect against scratching, chipping and marring. Use appropriate cleaners for each fixture type."
+        }
+    ],
     "Final Clean": [
         {
-            "task": "Polish mirrors, light fixtures, and shower glass",
-            "time_per_100": 1.0,
-            "instructions": "Use glass cleaner and microfiber cloth. Spray glass cleaner on mirrors and fixtures, wipe in circular motions to avoid streaks. Pay special attention to water spots and fingerprints."
-        },
-        {
-            "task": "Deep clean sinks, vanities, and toilets",
+            "task": "Final polish of all surfaces",
             "time_per_100": 1.5,
-            "instructions": "Apply bathroom cleaner inside and around bowl, under rim, and base. Scrub with toilet brush thoroughly. Clean vanity surfaces, faucets, and sink basin with appropriate cleaner."
+            "instructions": "Perform final polishing of all cleaned surfaces. Ensure all areas meet quality standards and are ready for homeowner delivery."
         },
         {
-            "task": "Vacuum and mop all floors",
+            "task": "Final window and glass cleaning",
+            "time_per_100": 1.0,
+            "instructions": "Final cleaning of all windows and glass surfaces. Ensure streak-free finish and remove any remaining spots or residue."
+        },
+        {
+            "task": "Final floor cleaning and inspection",
             "time_per_100": 2.0,
-            "instructions": "Vacuum all carpeted areas thoroughly, including corners and edges. Sweep hard floors first, then mop with appropriate floor cleaner. Pay attention to baseboards and corners."
+            "instructions": "Complete final cleaning of all floors. Vacuum carpets, mop hard surfaces, and inspect for any remaining debris or stains."
+        }
+    ],
+    "QC Clean": [
+        {
+            "task": "Quality control inspection and touch-ups",
+            "time_per_100": 1.0,
+            "instructions": "Conduct thorough quality control inspection. Address any areas that do not meet standards and perform necessary touch-ups."
         },
         {
-            "task": "Dust all surfaces and baseboards",
-            "time_per_100": 1.2,
-            "instructions": "Use microfiber cloth to dust all horizontal surfaces including windowsills, light switches, door frames, and baseboards. Work from top to bottom to avoid re-dusting lower areas."
-        },
-        {
-            "task": "Clean kitchen appliances and countertops",
-            "time_per_100": 2.5,
-            "instructions": "Wipe down all countertops with appropriate cleaner. Clean exterior of appliances including refrigerator, oven, microwave, and dishwasher. Clean sink and faucet thoroughly."
-        },
-        {
-            "task": "Window cleaning (interior)",
-            "time_per_100": 0.8,
-            "instructions": "Clean interior windows with glass cleaner and squeegee or microfiber cloth. Remove any adhesive residue, paint spots, or construction debris from glass surfaces."
-        },
-        {
-            "task": "Remove construction debris and dust",
-            "time_per_100": 1.8,
-            "instructions": "Remove all visible construction dust, debris, and materials. Wipe down all surfaces that may have accumulated dust during construction. Check corners and crevices."
-        },
-        {
-            "task": "Final walkthrough and touch-ups",
+            "task": "Final quality verification",
             "time_per_100": 0.5,
-            "instructions": "Conduct thorough walkthrough to identify any missed areas. Address any remaining cleaning needs and ensure all areas meet quality standards."
+            "instructions": "Final verification that all cleaning meets ResiBuilt quality standards before homeowner delivery."
+        }
+    ],
+    "Spec Clean": [
+        {
+            "task": "Specification-based cleaning tasks",
+            "time_per_100": 1.2,
+            "instructions": "Complete any specific cleaning tasks as outlined in the project specifications. Address any special requirements or custom cleaning needs."
+        },
+        {
+            "task": "Special attention areas",
+            "time_per_100": 0.8,
+            "instructions": "Focus on areas requiring special attention as specified in the project requirements. Ensure all specification requirements are met."
         }
     ]
 }
