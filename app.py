@@ -255,28 +255,6 @@ def submit_job():
             flash('Square footage must be greater than 0.', 'error')
             return redirect(url_for('index'))
         
-        # Handle file uploads
-        before_photo_filename = None
-        after_photo_filename = None
-        
-        # Process before photo
-        if 'before_photo' in request.files:
-            before_file = request.files['before_photo']
-            if before_file and before_file.filename and allowed_file(before_file.filename):
-                # Generate unique filename
-                file_extension = before_file.filename.rsplit('.', 1)[1].lower()
-                before_photo_filename = f"before_{uuid.uuid4()}.{file_extension}"
-                before_file.save(os.path.join(app.config['UPLOAD_FOLDER'], before_photo_filename))
-        
-        # Process after photo
-        if 'after_photo' in request.files:
-            after_file = request.files['after_photo']
-            if after_file and after_file.filename and allowed_file(after_file.filename):
-                # Generate unique filename
-                file_extension = after_file.filename.rsplit('.', 1)[1].lower()
-                after_photo_filename = f"after_{uuid.uuid4()}.{file_extension}"
-                after_file.save(os.path.join(app.config['UPLOAD_FOLDER'], after_photo_filename))
-        
         # Calculate task times
         calculated_tasks = calculate_task_times(cleaning_type, square_footage)
         total_estimated_minutes = sum(task['estimated_minutes'] for task in calculated_tasks)
@@ -290,8 +268,6 @@ def submit_job():
             'cleaner_name': cleaner_name,
             'square_footage': square_footage,
             'cleaning_type': cleaning_type,
-            'job_before_photo': before_photo_filename,
-            'job_after_photo': after_photo_filename,
             'tasks': calculated_tasks,
             'total_estimated_minutes': round(total_estimated_minutes, 1),
             'total_estimated_hours': total_estimated_hours,
