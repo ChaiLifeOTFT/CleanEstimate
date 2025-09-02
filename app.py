@@ -22,99 +22,167 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 # Ensure upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Task library with cleaning tasks and time estimates based on ResiBuilt specifications
+# Task library with comprehensive cleaning guidance including products, methods, and safety
 task_library = {
     "Rough Clean": [
         {
             "task": "Clean all tubs and shower pans",
             "time_per_100": 1.2,
-            "instructions": "Clean all tubs and shower pans thoroughly. Use appropriate cleaners that will not scratch, chip, or mar the surfaces. Remove all construction debris and residue."
+            "instructions": "Clean all tubs and shower pans thoroughly. Remove construction debris, adhesive residue, and protective films.",
+            "method": "Spray Zep Calcium, Lime & Rust Remover on all surfaces. Let sit 2-3 minutes. Scrub with non-abrasive pad in circular motions. Rinse thoroughly with clean water and dry with microfiber cloth.",
+            "materials": ["Zep Calcium, Lime & Rust Remover", "Non-abrasive scrub pad", "Microfiber cloths", "Clean water", "Rubber gloves"],
+            "approved_products": ["✅ Zep Calcium, Lime & Rust Remover", "🔄 CLR (backup)", "🔄 Barkeepers Friend (for stubborn stains)"],
+            "precautions": "Never use steel wool or abrasive cleaners on acrylic or fiberglass surfaces. Test on inconspicuous area first. Ensure adequate ventilation."
         },
         {
             "task": "Clean window frames inside and outside",
             "time_per_100": 1.5,
-            "instructions": "Clean all window frames both inside and outside, using care not to scratch frames. Use proper cleaning materials and techniques to avoid damage."
+            "instructions": "Clean all window frames both inside and outside, removing construction dust, paint splatters, and adhesive residue.",
+            "method": "Spray Zep All-Purpose Cleaner on frames. Use detail brush for crevices and corners. Wipe clean with microfiber cloth. For paint removal, use plastic scraper then re-clean.",
+            "materials": ["Zep All-Purpose Cleaner", "Detail brush", "Microfiber cloths", "Plastic scraper", "Extension pole (if needed)"],
+            "approved_products": ["✅ Zep All-Purpose Cleaner", "🔄 Simple Green (backup)", "🔄 Goof Off (for adhesive removal)"],
+            "precautions": "Do not use metal scrapers on frames. Be careful around weatherstripping and seals. Avoid getting cleaner on glass surfaces."
         },
         {
             "task": "Clean sliding glass door frames and panels",
             "time_per_100": 1.0,
-            "instructions": "Clean sliding glass door frames and glass panels. Ensure all glass is left free of streaks and spots by using proper cleaning materials."
+            "instructions": "Clean sliding glass door frames and glass panels. Ensure smooth operation and streak-free glass.",
+            "method": "Remove loose debris from tracks. Spray Zep Foaming Glass Cleaner on glass panels. Clean frames with All-Purpose Cleaner. Buff glass with lint-free cloth in circular motions.",
+            "materials": ["Zep Foaming Glass Cleaner", "Zep All-Purpose Cleaner", "Lint-free cloths", "Detail brush", "Vacuum with brush attachment"],
+            "approved_products": ["✅ Zep Foaming Glass Cleaner", "✅ Zep All-Purpose Cleaner", "🔄 Sprayway Glass Cleaner (backup)"],
+            "precautions": "Do not spray cleaner directly into tracks. Ensure doors slide smoothly after cleaning. Check for loose glass panels."
         },
         {
             "task": "Clean and vacuum window and door tracks",
             "time_per_100": 0.8,
-            "instructions": "All window frames and sliding glass door tracks will be brushed clean and vacuumed. Remove all debris and construction materials from tracks."
+            "instructions": "Remove all construction debris, dust, and materials from window and door tracks. Ensure smooth operation.",
+            "method": "Vacuum tracks with brush attachment. Use detail brush to remove stubborn debris. Spray tracks with compressed air if available. Wipe with damp microfiber cloth.",
+            "materials": ["Vacuum with brush attachment", "Detail brush", "Microfiber cloths", "Compressed air (optional)", "Small screwdriver for debris removal"],
+            "approved_products": ["✅ Zep All-Purpose Cleaner (for stubborn residue)", "🔄 Simple Green (backup)"],
+            "precautions": "Do not force debris removal that might damage tracks. Check for proper window/door operation after cleaning."
         },
         {
             "task": "Clean cabinets and vanities inside and outside",
             "time_per_100": 2.0,
-            "instructions": "All cabinets and vanities will be cleaned inside and outside. Interior should be vacuumed and washed or wiped clean. Use cleaner that will not scratch or mar doors, cabinets, or countertops. Clean tops of cabinets."
+            "instructions": "Clean all cabinet exteriors, interiors, doors, and tops. Remove construction dust, fingerprints, and protective films.",
+            "method": "Vacuum cabinet interiors first. Spray Zep Wood Floor & Cabinet Cleaner on cloth (not directly on surface). Wipe in direction of wood grain. Clean hardware with All-Purpose Cleaner on cloth.",
+            "materials": ["Zep Wood Floor & Cabinet Cleaner", "Zep All-Purpose Cleaner", "Microfiber cloths", "Vacuum with brush attachment", "Step ladder"],
+            "approved_products": ["✅ Zep Wood Floor & Cabinet Cleaner", "✅ Zep All-Purpose Cleaner", "🔄 Murphy's Oil Soap (backup)", "🔄 Method Wood Cleaner (backup)"],
+            "precautions": "Never spray cleaner directly on wood surfaces. Test on inconspicuous area first. Do not oversaturate wood. Clean spills immediately."
         },
         {
             "task": "Clean all drawers",
             "time_per_100": 0.6,
-            "instructions": "All drawers will be vacuumed clean and wiped clean. Remove all construction debris and dust from drawer interiors."
+            "instructions": "Vacuum and wipe clean all drawer interiors and exteriors. Remove construction debris and dust.",
+            "method": "Remove drawers if possible. Vacuum interiors thoroughly. Wipe with damp microfiber cloth using Wood Floor & Cabinet Cleaner. Check drawer slides and clean if needed.",
+            "materials": ["Zep Wood Floor & Cabinet Cleaner", "Microfiber cloths", "Vacuum with brush attachment", "Detail brush"],
+            "approved_products": ["✅ Zep Wood Floor & Cabinet Cleaner", "🔄 Method Wood Cleaner (backup)"],
+            "precautions": "Handle drawers carefully to avoid damage to slides. Do not force stuck drawers. Check weight limits."
         },
         {
             "task": "Clean closet shelves",
             "time_per_100": 0.4,
-            "instructions": "All closet shelves to be wiped clean. Remove dust and construction debris from all shelf surfaces."
+            "instructions": "Remove dust and construction debris from all closet shelf surfaces, brackets, and support systems.",
+            "method": "Dust shelves with microfiber cloth first. Spray Wood Floor & Cabinet Cleaner on cloth and wipe shelves. Clean brackets and supports with All-Purpose Cleaner.",
+            "materials": ["Zep Wood Floor & Cabinet Cleaner", "Zep All-Purpose Cleaner", "Microfiber cloths", "Step ladder"],
+            "approved_products": ["✅ Zep Wood Floor & Cabinet Cleaner", "✅ Zep All-Purpose Cleaner", "🔄 Pledge (backup)"],
+            "precautions": "Check shelf stability before applying weight. Clean support brackets to ensure proper function."
         },
         {
             "task": "Clean interior and exterior doors",
             "time_per_100": 1.0,
-            "instructions": "All interior and exterior doors will be cleaned, including door knobs, lock sets and thresholds. Remove excess residue on hardware and thresholds (paint or joint compound) using appropriate cleaning agents."
+            "instructions": "Clean all door surfaces, hardware, and thresholds. Remove paint overspray, fingerprints, and adhesive residue.",
+            "method": "For painted doors: use All-Purpose Cleaner on microfiber cloth. For wood doors: use Wood Floor & Cabinet Cleaner. Clean hardware with All-Purpose Cleaner. Use plastic scraper for paint removal.",
+            "materials": ["Zep All-Purpose Cleaner", "Zep Wood Floor & Cabinet Cleaner", "Microfiber cloths", "Plastic scraper", "Detail brush"],
+            "approved_products": ["✅ Zep All-Purpose Cleaner", "✅ Zep Wood Floor & Cabinet Cleaner", "🔄 Goof Off (for stubborn residue)"],
+            "precautions": "Test cleaners on inconspicuous area. Do not use abrasive materials on hardware. Check door operation after cleaning."
         },
         {
             "task": "Clean electrical fixtures and appliances",
             "time_per_100": 1.2,
-            "instructions": "All electrical fixtures, exposed light bulbs and appliances will be cleaned. Use appropriate cleaners and techniques to avoid damage to electrical components."
+            "instructions": "Clean all light fixtures, switch plates, outlet covers, and exposed appliances. Remove construction dust and fingerprints.",
+            "method": "Turn off power to fixtures when possible. Use damp microfiber cloth with All-Purpose Cleaner. For glass fixtures, use Foaming Glass Cleaner. Dry thoroughly before restoring power.",
+            "materials": ["Zep All-Purpose Cleaner", "Zep Foaming Glass Cleaner", "Microfiber cloths", "Step ladder", "Non-conductive cleaning tools"],
+            "approved_products": ["✅ Zep All-Purpose Cleaner", "✅ Zep Foaming Glass Cleaner", "🔄 Simple Green (backup)"],
+            "precautions": "Turn off power before cleaning. Never spray cleaner directly on electrical components. Ensure hands and materials are dry. Use non-metal tools near electrical."
         },
         {
             "task": "Clean plumbing fixtures",
             "time_per_100": 1.5,
-            "instructions": "All plumbing fixtures, including tubs, sinks and water closets, will be cleaned in a manner that will protect against scratching, chipping and marring. Use appropriate cleaners for each fixture type."
+            "instructions": "Clean all sinks, faucets, toilets, and plumbing hardware. Remove water spots, construction dust, and protective films.",
+            "method": "Use Calcium, Lime & Rust Remover for mineral deposits. Scrub gently with non-abrasive pad. For chrome fixtures, use Foaming Glass Cleaner for streak-free finish. Dry with microfiber cloth.",
+            "materials": ["Zep Calcium, Lime & Rust Remover", "Zep Foaming Glass Cleaner", "Non-abrasive scrub pads", "Microfiber cloths", "Toilet brush"],
+            "approved_products": ["✅ Zep Calcium, Lime & Rust Remover", "✅ Zep Foaming Glass Cleaner", "🔄 CLR (backup)", "🔄 Barkeepers Friend (for stubborn stains)"],
+            "precautions": "Do not mix different cleaners. Test on inconspicuous area first. Avoid abrasive materials on chrome or brushed finishes. Ensure adequate ventilation."
         }
     ],
     "Final Clean": [
         {
             "task": "Final polish of all surfaces",
             "time_per_100": 1.5,
-            "instructions": "Perform final polishing of all cleaned surfaces. Ensure all areas meet quality standards and are ready for homeowner delivery."
+            "instructions": "Perform final detailing and polishing of all surfaces. Ensure showroom-quality finish for homeowner delivery.",
+            "method": "Dust all surfaces first. Apply appropriate Zep cleaner based on surface type. Buff to shine with clean microfiber cloths. Check for missed spots under different lighting.",
+            "materials": ["Zep Wood Floor & Cabinet Cleaner", "Zep All-Purpose Cleaner", "Zep Foaming Glass Cleaner", "Multiple microfiber cloths", "Dusting spray"],
+            "approved_products": ["✅ Zep Complete Product Line", "🔄 Pledge (for wood)", "🔄 Windex (for glass)"],
+            "precautions": "Use appropriate cleaner for each surface type. Work in good lighting to spot imperfections. Allow surfaces to dry completely."
         },
         {
             "task": "Final window and glass cleaning",
             "time_per_100": 1.0,
-            "instructions": "Final cleaning of all windows and glass surfaces. Ensure streak-free finish and remove any remaining spots or residue."
+            "instructions": "Achieve streak-free, crystal-clear finish on all windows and glass surfaces for final inspection.",
+            "method": "Spray Zep Foaming Glass Cleaner on glass. Use squeegee for large surfaces, microfiber for small areas. Buff edges and corners with lint-free cloth. Check for streaks in different lighting.",
+            "materials": ["Zep Foaming Glass Cleaner", "Professional squeegee", "Lint-free cloths", "Extension pole", "Razor blade for stubborn spots"],
+            "approved_products": ["✅ Zep Foaming Glass Cleaner", "🔄 Sprayway Glass Cleaner", "🔄 Invisible Glass (backup)"],
+            "precautions": "Work in shade when possible. Clean glass when cool to touch. Use proper ladder safety for high windows."
         },
         {
             "task": "Final floor cleaning and inspection",
             "time_per_100": 2.0,
-            "instructions": "Complete final cleaning of all floors. Vacuum carpets, mop hard surfaces, and inspect for any remaining debris or stains."
+            "instructions": "Complete final cleaning of all flooring surfaces. Vacuum carpets, clean hard surfaces, and perform quality inspection.",
+            "method": "Vacuum carpets with crevice tool along edges. Mop hard floors with Zep Neutral Floor Cleaner. Check for missed debris, spots, or damage. Touch up as needed.",
+            "materials": ["Zep Neutral Floor Cleaner", "Professional vacuum", "Microfiber mop", "Clean mop water", "Spot cleaning supplies"],
+            "approved_products": ["✅ Zep Neutral Floor Cleaner", "✅ Zep Wood Floor & Cabinet Cleaner (for wood)", "🔄 Bona (for hardwood backup)"],
+            "precautions": "Use appropriate cleaner for floor type. Change mop water frequently. Check for proper drying to avoid water damage."
         }
     ],
     "QC Clean": [
         {
             "task": "Quality control inspection and touch-ups",
             "time_per_100": 1.0,
-            "instructions": "Conduct thorough quality control inspection. Address any areas that do not meet standards and perform necessary touch-ups."
+            "instructions": "Conduct comprehensive quality inspection using checklist. Address any deficiencies found during inspection.",
+            "method": "Systematically inspect each room with QC checklist. Use flashlight to check corners and hidden areas. Touch up any missed spots with appropriate Zep products. Document any issues.",
+            "materials": ["QC inspection checklist", "Flashlight", "Full range of Zep cleaners", "Microfiber cloths", "Touch-up supplies"],
+            "approved_products": ["✅ Complete Zep Product Line", "🔄 Spot-specific alternatives as needed"],
+            "precautions": "Be thorough but efficient. Document any damage or pre-existing conditions. Ensure all team members understand QC standards."
         },
         {
             "task": "Final quality verification",
             "time_per_100": 0.5,
-            "instructions": "Final verification that all cleaning meets ResiBuilt quality standards before homeowner delivery."
+            "instructions": "Final walkthrough to verify all ResiBuilt quality standards are met before homeowner delivery.",
+            "method": "Complete final walkthrough with supervisor or lead cleaner. Verify all checklist items are complete. Take final photos if required. Ensure all supplies are removed.",
+            "materials": ["Final inspection checklist", "Camera for documentation", "Any final touch-up supplies"],
+            "approved_products": ["✅ Any remaining Zep products for final touch-ups"],
+            "precautions": "Double-check all areas are accessible to homeowner. Ensure no cleaning supplies or equipment left behind. Verify all utilities are functioning."
         }
     ],
     "Spec Clean": [
         {
             "task": "Specification-based cleaning tasks",
             "time_per_100": 1.2,
-            "instructions": "Complete any specific cleaning tasks as outlined in the project specifications. Address any special requirements or custom cleaning needs."
+            "instructions": "Complete any specific cleaning tasks as outlined in the project specifications. Address special requirements or custom needs.",
+            "method": "Review project specifications carefully. Use appropriate Zep products based on surface types and requirements. Follow any special procedures outlined in the specs.",
+            "materials": ["Project specifications", "Full range of Zep cleaners", "Specialized tools as required", "Safety equipment"],
+            "approved_products": ["✅ Zep products appropriate for specified surfaces", "🔄 Specialty products as approved by supervisor"],
+            "precautions": "Follow all safety requirements in specifications. Get supervisor approval for any deviations. Document any special procedures used."
         },
         {
             "task": "Special attention areas",
             "time_per_100": 0.8,
-            "instructions": "Focus on areas requiring special attention as specified in the project requirements. Ensure all specification requirements are met."
+            "instructions": "Focus on areas requiring special attention as specified in project requirements. Ensure all specification requirements are met.",
+            "method": "Identify special attention areas from project documents. Apply extra care and appropriate products. Verify completion meets or exceeds specified standards.",
+            "materials": ["Project documentation", "Appropriate Zep cleaners", "Specialized equipment", "Measuring tools if needed"],
+            "approved_products": ["✅ Zep products suitable for special requirements", "🔄 Approved specialty products"],
+            "precautions": "Pay extra attention to specified areas. Document completion with photos if required. Ensure compliance with all special requirements."
         }
     ]
 }
@@ -138,6 +206,10 @@ def calculate_task_times(cleaning_type, square_footage):
         calculated_task = {
             "task": task["task"],
             "instructions": task["instructions"],
+            "method": task["method"],
+            "materials": task["materials"],
+            "approved_products": task["approved_products"],
+            "precautions": task["precautions"],
             "estimated_minutes": round(estimated_minutes, 1),
             "estimated_hours": round(estimated_minutes / 60, 2)
         }
