@@ -108,37 +108,68 @@
                     <div class="card-header bg-info bg-opacity-10">
                         <h4 class="card-title mb-0">
                             <i class="fas fa-stopwatch me-2"></i>
-                            Task Timer
+                            Task Timer & Documentation
                         </h4>
                     </div>
                     <div class="card-body">
-                        <div class="text-center mb-4">
-                            <h2 id="timer-display" class="display-4 mb-2">00:00:00</h2>
-                            <p class="text-muted">
-                                Estimated Time: <span class="badge bg-secondary">{{ task.estimated_minutes }} minutes</span>
-                            </p>
-                            <div id="overtime-alert" class="alert alert-warning mt-3" style="display: none;">
-                                <i class="fas fa-exclamation-triangle me-2"></i>
-                                <strong>Time Exceeded!</strong> This task is taking longer than estimated.
+                        <!-- Start Task Section -->
+                        <div id="start-task-section">
+                            <div class="text-center mb-4">
+                                <h2 id="timer-display" class="display-4 mb-2">00:00:00</h2>
+                                <p class="text-muted">
+                                    Estimated Time: <span class="badge bg-secondary">{{ task.estimated_minutes }} minutes</span>
+                                </p>
+                                <div id="overtime-alert" class="alert alert-warning mt-3" style="display: none;">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <strong>Time Exceeded!</strong> This task is taking longer than estimated.
+                                </div>
+                            </div>
+                            
+                            <!-- Before Photo Section (visible before starting) -->
+                            <div id="before-photo-section" class="mb-3">
+                                <label for="task_before_photo" class="form-label">
+                                    <i class="fas fa-camera me-1"></i>
+                                    Take Before Photo (Required to Start)
+                                </label>
+                                <input type="file" class="form-control" id="task_before_photo" accept="image/*" required>
+                                <div class="form-text">Document the area before starting the task</div>
+                                
+                                <!-- Preview area -->
+                                <div id="before_preview" class="mt-2" style="display: none;">
+                                    <img id="before_img" class="img-fluid rounded border" style="max-height: 200px;" alt="Before photo preview">
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="button" id="start-task-btn" class="btn btn-primary btn-lg" disabled>
+                                    <i class="fas fa-play me-2"></i>
+                                    Upload Before Photo & Start Task
+                                </button>
                             </div>
                         </div>
                         
-                        <div class="d-grid gap-2">
-                            <button type="button" id="start-task-btn" class="btn btn-primary btn-lg">
-                                <i class="fas fa-play me-2"></i>
-                                Start Task
-                            </button>
-                            <div id="timer-running-btns" style="display: none;">
-                                <div class="d-grid gap-2">
-                                    <button type="button" class="btn btn-warning btn-lg" data-bs-toggle="modal" data-bs-target="#timeExtensionModal">
-                                        <i class="fas fa-clock me-2"></i>
-                                        Request More Time
-                                    </button>
-                                    <button type="button" id="stop-task-btn" class="btn btn-success btn-lg">
-                                        <i class="fas fa-stop me-2"></i>
-                                        Stop Timer & Continue
-                                    </button>
+                        <!-- Running Task Section (hidden initially) -->
+                        <div id="timer-running-btns" style="display: none;">
+                            <div class="text-center mb-4">
+                                <h2 id="timer-display-running" class="display-4 mb-2">00:00:00</h2>
+                                <div class="alert alert-info">
+                                    <i class="fas fa-running me-2"></i>
+                                    Task in progress... Clean the area according to instructions.
                                 </div>
+                                <div id="overtime-alert-running" class="alert alert-warning mt-3" style="display: none;">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <strong>Time Exceeded!</strong> This task is taking longer than estimated.
+                                </div>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-warning btn-lg" data-bs-toggle="modal" data-bs-target="#timeExtensionModal">
+                                    <i class="fas fa-clock me-2"></i>
+                                    Request More Time
+                                </button>
+                                <button type="button" id="stop-task-btn" class="btn btn-success btn-lg">
+                                    <i class="fas fa-stop me-2"></i>
+                                    Task Complete - Take After Photo
+                                </button>
                             </div>
                         </div>
                         
@@ -157,41 +188,27 @@
                 <div class="card">
                     <div class="card-header">
                         <h4 class="card-title mb-0">
-                            <i class="fas fa-camera me-2"></i>
-                            Document This Task
+                            <i class="fas fa-camera-retro me-2"></i>
+                            Complete Task Documentation
                         </h4>
                     </div>
                     <div class="card-body">
                         <form action="{{ url_for('complete_task', task_index=task_index) }}" method="POST" enctype="multipart/form-data" id="taskForm">
-                            <div class="row">
-                                <!-- Before Photo -->
-                                <div class="col-md-6 mb-3">
-                                    <label for="task_before_photo" class="form-label">
-                                        <i class="fas fa-camera me-1"></i>
-                                        Before Photo
-                                    </label>
-                                    <input type="file" class="form-control" id="task_before_photo" name="task_before_photo" accept="image/*">
-                                    <div class="form-text">Upload a photo before starting this task</div>
-                                    
-                                    <!-- Preview area -->
-                                    <div id="before_preview" class="mt-2" style="display: none;">
-                                        <img id="before_img" class="img-fluid rounded border" style="max-height: 200px;" alt="Before photo preview">
-                                    </div>
-                                </div>
+                            <!-- Hidden field for before photo filename -->
+                            <input type="hidden" id="before_photo_filename" name="before_photo_filename" value="">
+                            
+                            <!-- After Photo -->
+                            <div class="mb-3">
+                                <label for="task_after_photo" class="form-label">
+                                    <i class="fas fa-camera me-1"></i>
+                                    Take After Photo (Required)
+                                </label>
+                                <input type="file" class="form-control" id="task_after_photo" name="task_after_photo" accept="image/*" required>
+                                <div class="form-text">Document the completed task to show the results</div>
                                 
-                                <!-- After Photo -->
-                                <div class="col-md-6 mb-3">
-                                    <label for="task_after_photo" class="form-label">
-                                        <i class="fas fa-camera me-1"></i>
-                                        After Photo
-                                    </label>
-                                    <input type="file" class="form-control" id="task_after_photo" name="task_after_photo" accept="image/*">
-                                    <div class="form-text">Upload a photo after completing this task</div>
-                                    
-                                    <!-- Preview area -->
-                                    <div id="after_preview" class="mt-2" style="display: none;">
-                                        <img id="after_img" class="img-fluid rounded border" style="max-height: 200px;" alt="After photo preview">
-                                    </div>
+                                <!-- Preview area -->
+                                <div id="after_preview" class="mt-2" style="display: none;">
+                                    <img id="after_img" class="img-fluid rounded border" style="max-height: 200px;" alt="After photo preview">
                                 </div>
                             </div>
                             
@@ -380,26 +397,6 @@
     
     <!-- Photo Preview Script -->
     <script>
-        // Before photo preview
-        document.getElementById('task_before_photo').addEventListener('change', function() {
-            const file = this.files[0];
-            if (file) {
-                if (file.size > 16 * 1024 * 1024) {
-                    alert('File is too large. Maximum file size is 16MB.');
-                    this.value = '';
-                    return;
-                }
-                
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById('before_img').src = e.target.result;
-                    document.getElementById('before_preview').style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            } else {
-                document.getElementById('before_preview').style.display = 'none';
-            }
-        });
 
         // After photo preview
         document.getElementById('task_after_photo').addEventListener('change', function() {
@@ -469,12 +466,27 @@
         function updateTimer() {
             const now = Date.now();
             elapsedTime = Math.floor((now - startTime) / 1000);
-            document.getElementById('timer-display').textContent = formatTime(elapsedTime);
+            const timeStr = formatTime(elapsedTime);
+            
+            // Update both timer displays
+            const timerDisplay = document.getElementById('timer-display');
+            const timerDisplayRunning = document.getElementById('timer-display-running');
+            if (timerDisplay) timerDisplay.textContent = timeStr;
+            if (timerDisplayRunning) timerDisplayRunning.textContent = timeStr;
             
             // Check if overtime
             const elapsedMinutes = elapsedTime / 60;
             if (elapsedMinutes > estimatedMinutes && !overtimeAlertShown) {
-                document.getElementById('overtime-alert').style.display = 'block';
+                // Show overtime alerts
+                const overtimeAlert = document.getElementById('overtime-alert');
+                const overtimeAlertRunning = document.getElementById('overtime-alert-running');
+                if (overtimeAlert) overtimeAlert.style.display = 'block';
+                if (overtimeAlertRunning) overtimeAlertRunning.style.display = 'block';
+                
+                // Make timer red
+                if (timerDisplay) timerDisplay.classList.add('text-danger');
+                if (timerDisplayRunning) timerDisplayRunning.classList.add('text-danger');
+                
                 // Play alert sound if available
                 const audio = new Audio('data:audio/wav;base64,UklGRhwMAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoMAACAhICCgICAgICA');
                 audio.play().catch(e => console.log('Audio play failed'));
@@ -482,31 +494,81 @@
             }
         }
 
-        // Start task timer
+        // Enable start button only when before photo is selected
+        document.getElementById('task_before_photo').addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                if (file.size > 16 * 1024 * 1024) {
+                    alert('File is too large. Maximum file size is 16MB.');
+                    this.value = '';
+                    document.getElementById('start-task-btn').disabled = true;
+                    return;
+                }
+                
+                document.getElementById('start-task-btn').disabled = false;
+                
+                // Show preview
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('before_img').src = e.target.result;
+                    document.getElementById('before_preview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                document.getElementById('start-task-btn').disabled = true;
+                document.getElementById('before_preview').style.display = 'none';
+            }
+        });
+
+        // Start task timer with before photo upload
         document.getElementById('start-task-btn').addEventListener('click', async function() {
+            const beforePhotoInput = document.getElementById('task_before_photo');
+            if (!beforePhotoInput.files[0]) {
+                alert('Please select a before photo first.');
+                return;
+            }
+            
+            // Upload before photo first
+            const formData = new FormData();
+            formData.append('before_photo', beforePhotoInput.files[0]);
+            formData.append('task_index', taskIndex);
+            
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Uploading photo...';
+            
             try {
-                const response = await fetch(`/start_task/${taskIndex}`, {
+                const response = await fetch('/upload_before_photo', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
+                    body: formData
                 });
                 
                 if (response.ok) {
                     const data = await response.json();
+                    // Store the before photo filename
+                    document.getElementById('before_photo_filename').value = data.filename;
+                    
+                    // Now start the timer
                     startTime = Date.now();
                     isRunning = true;
                     
-                    // Update UI
-                    document.getElementById('start-task-btn').style.display = 'none';
+                    // Update UI - hide the entire start section
+                    document.getElementById('start-task-section').style.display = 'none';
                     document.getElementById('timer-running-btns').style.display = 'block';
+                    
+                    // Move timer display to running section (already visible there)
                     
                     // Start interval timer
                     timerInterval = setInterval(updateTimer, 1000);
                 } else {
-                    alert('Failed to start timer. Please try again.');
+                    alert('Failed to upload before photo. Please try again.');
+                    this.disabled = false;
+                    this.innerHTML = '<i class="fas fa-play me-2"></i>Upload Before Photo & Start Task';
                 }
             } catch (error) {
-                console.error('Error starting timer:', error);
-                alert('An error occurred while starting the timer.');
+                console.error('Error starting task:', error);
+                alert('An error occurred while starting the task.');
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-play me-2"></i>Upload Before Photo & Start Task';
             }
         });
 

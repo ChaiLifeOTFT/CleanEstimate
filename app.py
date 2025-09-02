@@ -195,6 +195,15 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def save_uploaded_file(file):
+    """Save an uploaded file and return the filename."""
+    if file and file.filename and allowed_file(file.filename):
+        file_extension = file.filename.rsplit('.', 1)[1].lower()
+        filename = f"{uuid.uuid4()}.{file_extension}"
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        return filename
+    return None
+
 def calculate_task_times(cleaning_type, square_footage):
     """Calculate estimated time for each task based on square footage"""
     tasks = task_library.get(cleaning_type, [])
@@ -331,9 +340,36 @@ def task_page(task_index):
                          progress=progress,
                          timer_data=timer_data)
 
+@app.route('/upload_before_photo', methods=['POST'])
+def upload_before_photo():
+    """Handle before photo upload when starting a task."""
+    try:
+        if 'before_photo' not in request.files:
+            return jsonify({'error': 'No photo provided'}), 400
+        
+        photo = request.files['before_photo']
+        if photo and photo.filename:
+            filename = save_uploaded_file(photo)
+            if filename:
+                # Store the filename in session for later use
+                task_index = request.form.get('task_index', 0)
+                if 'task_photos' not in session:
+                    session['task_photos'] = {}
+                session['task_photos'][str(task_index)] = {'before': filename}
+                session.modified = True
+                
+                return jsonify({'filename': filename, 'success': True})
+            else:
+                return jsonify({'error': 'Failed to save photo'}), 500
+        
+        return jsonify({'error': 'Invalid photo'}), 400
+    except Exception as e:
+        app.logger.error(f"Error uploading before photo: {str(e)}")
+        return jsonify({'error': 'An error occurred'}), 500
+
 @app.route('/complete_task/<int:task_index>', methods=['POST'])
 def complete_task(task_index):
-    """Handle task completion with before/after photos"""
+    """Handle task completion with after photo"""
     if 'job_data' not in session:
         flash('No active job found. Please start a new job.', 'error')
         return redirect(url_for('index'))
@@ -347,23 +383,22 @@ def complete_task(task_index):
         
         current_task = tasks[task_index]
         
-        # Handle before photo upload
+        # Get the before photo filename from session or form (already uploaded)
         before_photo_filename = None
-        if 'task_before_photo' in request.files:
-            before_file = request.files['task_before_photo']
-            if before_file and before_file.filename and allowed_file(before_file.filename):
-                file_extension = before_file.filename.rsplit('.', 1)[1].lower()
-                before_photo_filename = f"task_{task_index}_before_{uuid.uuid4()}.{file_extension}"
-                before_file.save(os.path.join(app.config['UPLOAD_FOLDER'], before_photo_filename))
+        if 'task_photos' in session and str(task_index) in session['task_photos']:
+            before_photo_filename = session['task_photos'][str(task_index)].get('before')
+        elif 'before_photo_filename' in request.form:
+            before_photo_filename = request.form['before_photo_filename']
         
-        # Handle after photo upload
+        # Handle after photo upload (required)
         after_photo_filename = None
         if 'task_after_photo' in request.files:
             after_file = request.files['task_after_photo']
-            if after_file and after_file.filename and allowed_file(after_file.filename):
-                file_extension = after_file.filename.rsplit('.', 1)[1].lower()
-                after_photo_filename = f"task_{task_index}_after_{uuid.uuid4()}.{file_extension}"
-                after_file.save(os.path.join(app.config['UPLOAD_FOLDER'], after_photo_filename))
+            if after_file and after_file.filename:
+                after_photo_filename = save_uploaded_file(after_file)
+                if not after_photo_filename:
+                    flash('Failed to save after photo. Please try again.', 'error')
+                    return redirect(url_for('task_page', task_index=task_index))
         
         # Get timer data if exists
         timer_data = job_data.get('task_timers', {}).get(str(task_index), {})
