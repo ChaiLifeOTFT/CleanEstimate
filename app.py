@@ -983,6 +983,88 @@ def download_pdf(job_id):
         mimetype='application/pdf'
     )
 
+@app.route('/ai_chat', methods=['POST'])
+def ai_chat():
+    """AI chat assistant endpoint"""
+    try:
+        import requests
+        
+        data = request.get_json()
+        user_message = data.get('message', '').strip()
+        
+        if not user_message:
+            return jsonify({'error': 'No message provided'}), 400
+        
+        # Get current task context if available
+        task_context = ""
+        if 'job_data' in session:
+            job_data = session['job_data']
+            current_task = data.get('current_task', '')
+            if current_task:
+                task_context = f"Current cleaning task: {current_task}. "
+            task_context += f"Cleaning type: {job_data.get('cleaning_type', 'General')}. "
+            task_context += f"Building size: {job_data.get('square_footage', 'Unknown')} sq ft. "
+        
+        # Enhanced system prompt for cleaning expertise
+        system_prompt = f"""You are Drake's Precision Cleaning AI Assistant - an expert cleaning consultant for post-construction residential cleaning. 
+
+{task_context}
+
+You help professional cleaners with:
+- Product recommendations (prefer Zep brand products)
+- Stain removal techniques
+- Surface-specific cleaning methods
+- Safety precautions and procedures
+- Time management tips
+- Equipment troubleshooting
+
+Always provide:
+- Specific product names when possible
+- Step-by-step instructions
+- Safety warnings
+- Estimated time requirements
+- Alternative solutions if first method doesn't work
+
+Keep responses concise but thorough. Focus on practical, actionable advice for professional cleaners working on construction sites."""
+
+        # Make request to Perplexity API
+        perplexity_url = "https://api.perplexity.ai/chat/completions"
+        headers = {
+            'Authorization': f'Bearer {os.environ.get("PERPLEXITY_API_KEY")}',
+            'Content-Type': 'application/json'
+        }
+        
+        payload = {
+            "model": "llama-3.1-sonar-small-128k-online",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ],
+            "max_tokens": 500,
+            "temperature": 0.2,
+            "top_p": 0.9,
+            "stream": False
+        }
+        
+        response = requests.post(perplexity_url, headers=headers, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            ai_response = response.json()
+            assistant_message = ai_response['choices'][0]['message']['content']
+            
+            return jsonify({
+                'success': True,
+                'message': assistant_message,
+                'citations': ai_response.get('citations', [])
+            })
+        else:
+            app.logger.error(f"Perplexity API error: {response.status_code} - {response.text}")
+            return jsonify({'error': 'AI service temporarily unavailable'}), 500
+            
+    except Exception as e:
+        app.logger.error(f"AI chat error: {str(e)}")
+        return jsonify({'error': 'Unable to process request'}), 500
+
 @app.route('/submitted')
 def submitted():
     """Results page - redirect to home if accessed directly"""
