@@ -113,7 +113,7 @@ def submit_job():
             flash('All fields are required.', 'error')
             return redirect(url_for('index'))
         
-        if square_footage <= 0:
+        if square_footage is None or square_footage <= 0:
             flash('Square footage must be greater than 0.', 'error')
             return redirect(url_for('index'))
         
