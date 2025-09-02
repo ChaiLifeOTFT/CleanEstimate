@@ -7,8 +7,106 @@
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
-    <!-- Mobile Optimizations -->
+    <!-- Mobile Optimizations & Photo Comparison -->
     <style>
+        /* Photo Comparison Styles */
+        .photo-comparison-container {
+            position: relative;
+            overflow: hidden;
+            cursor: ew-resize;
+            user-select: none;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        
+        .photo-comparison-container img {
+            display: block;
+            width: 100%;
+            height: auto;
+            max-height: 400px;
+            object-fit: cover;
+        }
+        
+        .photo-comparison-after {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            width: 50%;
+        }
+        
+        .photo-comparison-slider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 4px;
+            background: var(--bs-primary);
+            cursor: ew-resize;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+        
+        .photo-comparison-slider::before {
+            content: '\2194';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bs-primary);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        .comparison-label {
+            position: absolute;
+            top: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        
+        .comparison-label.before {
+            left: 10px;
+        }
+        
+        .comparison-label.after {
+            right: 10px;
+        }
+        
+        /* Side by side view option */
+        .side-by-side-comparison {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .side-by-side-comparison > div {
+            flex: 1;
+            text-align: center;
+        }
+        
+        .side-by-side-comparison img {
+            width: 100%;
+            height: auto;
+            max-height: 300px;
+            object-fit: cover;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
         @media (max-width: 768px) {
             /* Large buttons for field use */
             .btn {
@@ -155,6 +253,69 @@
         </div>
         {% endif %}
 
+        <!-- Photo Transformation Gallery -->
+        {% set tasks_with_both_photos = job_data.completed_tasks | selectattr('before_photo') | selectattr('after_photo') | list %}
+        {% if tasks_with_both_photos %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-success">
+                    <div class="card-header bg-success bg-opacity-10">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-magic me-2"></i>
+                            Visual Transformation Gallery
+                        </h3>
+                        <p class="mb-0 mt-1 text-muted">Interactive before/after comparison - drag the slider to reveal transformations</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-3">
+                            <i class="fas fa-hand-pointer me-2"></i>
+                            <strong>Interactive:</strong> Click and drag the blue slider or tap on mobile to compare before and after photos
+                        </div>
+                        <!-- Display first task with photos as featured comparison -->
+                        {% set featured_task = tasks_with_both_photos[0] %}
+                        <div class="mb-4">
+                            <h5 class="text-center mb-3">
+                                <span class="badge bg-primary">Featured Transformation</span> 
+                                {{ featured_task.task_name }}
+                            </h5>
+                            <div class="photo-comparison-container" style="max-width: 800px; margin: 0 auto;">
+                                <img src="{{ url_for('static', filename='uploads/' + featured_task.before_photo) }}" alt="Before" class="photo-comparison-before">
+                                <div class="photo-comparison-after">
+                                    <img src="{{ url_for('static', filename='uploads/' + featured_task.after_photo) }}" alt="After">
+                                </div>
+                                <div class="photo-comparison-slider"></div>
+                                <span class="comparison-label before">BEFORE</span>
+                                <span class="comparison-label after">AFTER</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Quick transformation stats -->
+                        <div class="row text-center mt-4">
+                            <div class="col-md-4">
+                                <h4 class="text-success">{{ tasks_with_both_photos|length }}</h4>
+                                <p class="text-muted mb-0">Documented Transformations</p>
+                            </div>
+                            <div class="col-md-4">
+                                <h4 class="text-info">{{ "{:,}".format(job_data.square_footage) }}</h4>
+                                <p class="text-muted mb-0">Square Feet Transformed</p>
+                            </div>
+                            <div class="col-md-4">
+                                <h4 class="text-primary">100%</h4>
+                                <p class="text-muted mb-0">Quality Assured</p>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        <p class="text-center text-muted mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            All individual task comparisons are shown below with detailed documentation
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
         <!-- Completed Tasks with Individual Photos -->
         <div class="row mb-4">
             <div class="col-12">
@@ -188,7 +349,43 @@
                                 </div>
                             </div>
                             <div class="card-body">
-                                {% if completed_task.before_photo or completed_task.after_photo %}
+                                {% if completed_task.before_photo and completed_task.after_photo %}
+                                <!-- Photo Comparison View -->
+                                <div class="mb-3">
+                                    <div class="btn-group btn-group-sm mb-2" role="group">
+                                        <button type="button" class="btn btn-outline-primary comparison-toggle active" data-view="slider" data-task="{{ completed_task.task_index }}">
+                                            <i class="fas fa-sliders-h me-1"></i>Slider
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary comparison-toggle" data-view="side" data-task="{{ completed_task.task_index }}">
+                                            <i class="fas fa-columns me-1"></i>Side by Side
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Slider View -->
+                                    <div class="photo-comparison-container" id="slider-{{ completed_task.task_index }}" data-task="{{ completed_task.task_index }}">
+                                        <img src="{{ url_for('static', filename='uploads/' + completed_task.before_photo) }}" alt="Before" class="photo-comparison-before">
+                                        <div class="photo-comparison-after">
+                                            <img src="{{ url_for('static', filename='uploads/' + completed_task.after_photo) }}" alt="After">
+                                        </div>
+                                        <div class="photo-comparison-slider"></div>
+                                        <span class="comparison-label before">BEFORE</span>
+                                        <span class="comparison-label after">AFTER</span>
+                                    </div>
+                                    
+                                    <!-- Side by Side View (hidden by default) -->
+                                    <div class="side-by-side-comparison" id="side-{{ completed_task.task_index }}" style="display: none;">
+                                        <div>
+                                            <h6 class="text-center mb-2"><i class="fas fa-arrow-left me-1"></i>Before</h6>
+                                            <img src="{{ url_for('static', filename='uploads/' + completed_task.before_photo) }}" alt="Before">
+                                        </div>
+                                        <div>
+                                            <h6 class="text-center mb-2">After<i class="fas fa-arrow-right ms-1"></i></h6>
+                                            <img src="{{ url_for('static', filename='uploads/' + completed_task.after_photo) }}" alt="After">
+                                        </div>
+                                    </div>
+                                </div>
+                                {% elif completed_task.before_photo or completed_task.after_photo %}
+                                <!-- Single photo display -->
                                 <div class="row">
                                     {% if completed_task.before_photo %}
                                     <div class="col-md-6 mb-2">
@@ -415,6 +612,87 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
+    <!-- Photo Comparison Script -->
+    <script>
+        // Photo comparison slider functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize all photo comparison sliders
+            const comparisons = document.querySelectorAll('.photo-comparison-container');
+            
+            comparisons.forEach(container => {
+                const slider = container.querySelector('.photo-comparison-slider');
+                const afterImage = container.querySelector('.photo-comparison-after');
+                let isActive = false;
+                
+                // Function to update slider position
+                function updateSliderPosition(x) {
+                    const rect = container.getBoundingClientRect();
+                    const position = Math.max(0, Math.min(x - rect.left, rect.width));
+                    const percentage = (position / rect.width) * 100;
+                    
+                    slider.style.left = percentage + '%';
+                    afterImage.style.width = percentage + '%';
+                }
+                
+                // Mouse events
+                container.addEventListener('mousedown', (e) => {
+                    isActive = true;
+                    updateSliderPosition(e.clientX);
+                });
+                
+                document.addEventListener('mousemove', (e) => {
+                    if (!isActive) return;
+                    e.preventDefault();
+                    updateSliderPosition(e.clientX);
+                });
+                
+                document.addEventListener('mouseup', () => {
+                    isActive = false;
+                });
+                
+                // Touch events for mobile
+                container.addEventListener('touchstart', (e) => {
+                    isActive = true;
+                    updateSliderPosition(e.touches[0].clientX);
+                });
+                
+                container.addEventListener('touchmove', (e) => {
+                    if (!isActive) return;
+                    e.preventDefault();
+                    updateSliderPosition(e.touches[0].clientX);
+                });
+                
+                container.addEventListener('touchend', () => {
+                    isActive = false;
+                });
+            });
+            
+            // Toggle between slider and side-by-side views
+            document.querySelectorAll('.comparison-toggle').forEach(button => {
+                button.addEventListener('click', function() {
+                    const view = this.dataset.view;
+                    const taskId = this.dataset.task;
+                    const sliderView = document.getElementById('slider-' + taskId);
+                    const sideView = document.getElementById('side-' + taskId);
+                    const buttons = this.parentElement.querySelectorAll('.comparison-toggle');
+                    
+                    // Update active button
+                    buttons.forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show/hide views
+                    if (view === 'slider') {
+                        sliderView.style.display = 'block';
+                        sideView.style.display = 'none';
+                    } else {
+                        sliderView.style.display = 'none';
+                        sideView.style.display = 'flex';
+                    }
+                });
+            });
+        });
+    </script>
+    
     <!-- Email Sending Script -->
     <script>
         document.getElementById('send-report-btn').addEventListener('click', async function() {
