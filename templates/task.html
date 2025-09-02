@@ -18,7 +18,7 @@
                             <i class="fas fa-tasks me-2"></i>
                             {{ job_data.cleaning_type }}
                         </h1>
-                        <p class="text-muted mb-0">{{ job_data.client_name }} - {{ job_data.job_address }}</p>
+                        <p class="text-muted mb-0">{{ job_data.client_name }} - {{ job_data.job_address }}{% if job_data.lot_number %} (Lot: {{ job_data.lot_number }}){% endif %}</p>
                     </div>
                     <div class="text-end">
                         <h6 class="mb-1">Task {{ progress.current }} of {{ progress.total }}</h6>

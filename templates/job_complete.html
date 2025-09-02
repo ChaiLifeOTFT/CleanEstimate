@@ -34,7 +34,7 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <p><strong><i class="fas fa-user me-2"></i>Client:</strong> {{ job_data.client_name }}</p>
-                                <p><strong><i class="fas fa-map-marker-alt me-2"></i>Address:</strong> {{ job_data.job_address }}</p>
+                                <p><strong><i class="fas fa-map-marker-alt me-2"></i>Address:</strong> {{ job_data.job_address }}{% if job_data.lot_number %}<br><strong><i class="fas fa-hashtag me-2"></i>Lot Number:</strong> {{ job_data.lot_number }}{% endif %}</p>
                                 <p><strong><i class="fas fa-user-tie me-2"></i>Cleaner:</strong> {{ job_data.cleaner_name }}</p>
                             </div>
                             <div class="col-md-6">

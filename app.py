@@ -157,6 +157,7 @@ def submit_job():
         # Get form data
         client_name = request.form.get('client_name', '').strip()
         job_address = request.form.get('job_address', '').strip()
+        lot_number = request.form.get('lot_number', '').strip()
         cleaner_name = request.form.get('cleaner_name', '').strip()
         square_footage = request.form.get('square_footage', type=int)
         cleaning_type = request.form.get('cleaning_type', '').strip()
@@ -201,6 +202,7 @@ def submit_job():
         session['job_data'] = {
             'client_name': client_name,
             'job_address': job_address,
+            'lot_number': lot_number,
             'cleaner_name': cleaner_name,
             'square_footage': square_footage,
             'cleaning_type': cleaning_type,
