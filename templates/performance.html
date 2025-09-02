@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Dashboard - Drake's Precision Cleaning</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* Dashboard specific styles */
+        .stat-card {
+            border-left: 4px solid var(--bs-primary);
+            transition: transform 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--bs-primary);
+        }
+        
+        .performance-badge {
+            font-size: 1.2rem;
+            padding: 10px 20px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 30px;
+        }
+        
+        .efficiency-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .efficiency-good { background-color: #28a745; }
+        .efficiency-warning { background-color: #ffc107; }
+        .efficiency-poor { background-color: #dc3545; }
+        
+        @media (max-width: 768px) {
+            .metric-value {
+                font-size: 2rem;
+            }
+            
+            .chart-container {
+                height: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="display-5">
+                        <i class="fas fa-chart-line me-3"></i>
+                        Performance Analytics
+                    </h1>
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-home me-2"></i>
+                        Back to Home
+                    </a>
+                </div>
+                <p class="lead text-muted">Track team efficiency and job performance metrics</p>
+            </div>
+        </div>
+
+        <!-- Date Range Selector -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-calendar-alt me-2"></i>
+                                    Performance Period: <span class="text-primary">{{ period_label }}</span>
+                                </h5>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <div class="btn-group" role="group">
+                                    <a href="?period=week" class="btn btn-sm {% if period == 'week' %}btn-primary{% else %}btn-outline-primary{% endif %}">Week</a>
+                                    <a href="?period=month" class="btn btn-sm {% if period == 'month' %}btn-primary{% else %}btn-outline-primary{% endif %}">Month</a>
+                                    <a href="?period=all" class="btn btn-sm {% if period == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">All Time</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Metrics Row -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-briefcase fa-2x mb-3 text-primary"></i>
+                        <div class="metric-value">{{ metrics.total_jobs }}</div>
+                        <p class="text-muted mb-0">Total Jobs</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-clock fa-2x mb-3 text-info"></i>
+                        <div class="metric-value">{{ metrics.avg_completion_time }}</div>
+                        <p class="text-muted mb-0">Avg Completion (min)</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-percentage fa-2x mb-3 text-success"></i>
+                        <div class="metric-value">{{ metrics.efficiency_rate }}%</div>
+                        <p class="text-muted mb-0">Efficiency Rate</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-ruler-combined fa-2x mb-3 text-warning"></i>
+                        <div class="metric-value">{{ "{:,}".format(metrics.total_sqft) }}</div>
+                        <p class="text-muted mb-0">Total Sq Ft</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance by Cleaner -->
+        <div class="row mb-4">
+            <div class="col-lg-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-user-clock me-2"></i>
+                            Performance by Cleaner
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Cleaner</th>
+                                        <th>Jobs</th>
+                                        <th>Avg Time</th>
+                                        <th>Efficiency</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for cleaner in cleaner_stats %}
+                                    <tr>
+                                        <td>
+                                            <i class="fas fa-user me-2"></i>
+                                            {{ cleaner.name }}
+                                        </td>
+                                        <td>{{ cleaner.job_count }}</td>
+                                        <td>{{ cleaner.avg_time }} min</td>
+                                        <td>
+                                            <span class="efficiency-indicator efficiency-{{ cleaner.efficiency_class }}"></span>
+                                            {{ cleaner.efficiency }}%
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Task Performance Analysis -->
+            <div class="col-lg-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-tasks me-2"></i>
+                            Task Performance Analysis
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="taskPerformanceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Time Analysis Charts -->
+        <div class="row mb-4">
+            <div class="col-lg-8 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>
+                            Estimated vs Actual Time by Job Type
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="timeComparisonChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Efficiency Trends -->
+            <div class="col-lg-4 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-chart-pie me-2"></i>
+                            Time Distribution
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="timeDistributionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task-Level Breakdown -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-list-ul me-2"></i>
+                            Task-Level Performance Breakdown
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Task Name</th>
+                                        <th>Times Completed</th>
+                                        <th>Avg Estimated</th>
+                                        <th>Avg Actual</th>
+                                        <th>Variance</th>
+                                        <th>Performance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for task in task_breakdown %}
+                                    <tr>
+                                        <td>{{ task.name }}</td>
+                                        <td>{{ task.count }}</td>
+                                        <td>{{ task.avg_estimated }} min</td>
+                                        <td>{{ task.avg_actual }} min</td>
+                                        <td>
+                                            {% if task.variance > 0 %}
+                                            <span class="text-warning">+{{ task.variance }} min</span>
+                                            {% else %}
+                                            <span class="text-success">{{ task.variance }} min</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar {% if task.performance >= 90 %}bg-success{% elif task.performance >= 75 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                                     style="width: {{ task.performance }}%">
+                                                    {{ task.performance }}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Options -->
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <button onclick="window.print()" class="btn btn-primary btn-lg me-2">
+                    <i class="fas fa-print me-2"></i>
+                    Print Report
+                </button>
+                <button onclick="exportData()" class="btn btn-outline-primary btn-lg">
+                    <i class="fas fa-download me-2"></i>
+                    Export Data
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Charts Script -->
+    <script>
+        // Task Performance Chart
+        const taskCtx = document.getElementById('taskPerformanceChart').getContext('2d');
+        new Chart(taskCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ task_labels | tojson }},
+                datasets: [{
+                    label: 'Average Completion Time (minutes)',
+                    data: {{ task_times | tojson }},
+                    backgroundColor: 'rgba(13, 110, 253, 0.5)',
+                    borderColor: 'rgba(13, 110, 253, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Time Comparison Chart
+        const comparisonCtx = document.getElementById('timeComparisonChart').getContext('2d');
+        new Chart(comparisonCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ job_types | tojson }},
+                datasets: [{
+                    label: 'Estimated Time',
+                    data: {{ estimated_times | tojson }},
+                    backgroundColor: 'rgba(25, 135, 84, 0.5)',
+                    borderColor: 'rgba(25, 135, 84, 1)',
+                    borderWidth: 2
+                }, {
+                    label: 'Actual Time',
+                    data: {{ actual_times | tojson }},
+                    backgroundColor: 'rgba(255, 193, 7, 0.5)',
+                    borderColor: 'rgba(255, 193, 7, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Time (minutes)'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Time Distribution Pie Chart
+        const pieCtx = document.getElementById('timeDistributionChart').getContext('2d');
+        new Chart(pieCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['On Time', 'Overtime', 'Under Time'],
+                datasets: [{
+                    data: {{ time_distribution | tojson }},
+                    backgroundColor: [
+                        'rgba(25, 135, 84, 0.7)',
+                        'rgba(255, 193, 7, 0.7)',
+                        'rgba(13, 110, 253, 0.7)'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+
+        // Export functionality
+        function exportData() {
+            // Create CSV data
+            const csvContent = "data:text/csv;charset=utf-8,Performance Report\n\n" +
+                "Metric,Value\n" +
+                "Total Jobs,{{ metrics.total_jobs }}\n" +
+                "Average Completion Time,{{ metrics.avg_completion_time }} min\n" +
+                "Efficiency Rate,{{ metrics.efficiency_rate }}%\n" +
+                "Total Square Footage,{{ metrics.total_sqft }}\n";
+            
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "performance_report.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+
+    <!-- Print Styles -->
+    <style>
+        @media print {
+            .btn {
+                display: none !important;
+            }
+            .card {
+                break-inside: avoid;
+            }
+        }
+    </style>
+</body>
+</html>

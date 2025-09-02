@@ -680,6 +680,133 @@ def job_complete():
     job_data = session['job_data']
     return render_template('job_complete.html', job_data=job_data)
 
+@app.route('/performance')
+def performance():
+    """Performance analytics dashboard"""
+    from datetime import datetime, timedelta
+    import random  # For demo data
+    
+    # Get period from query params
+    period = request.args.get('period', 'month')
+    
+    # Set period label
+    if period == 'week':
+        period_label = 'Last 7 Days'
+    elif period == 'month':
+        period_label = 'Last 30 Days'
+    else:
+        period_label = 'All Time'
+    
+    # Demo performance metrics (in production, this would come from database)
+    metrics = {
+        'total_jobs': 47 if period == 'month' else 12 if period == 'week' else 156,
+        'avg_completion_time': 185,
+        'efficiency_rate': 92,
+        'total_sqft': 145000 if period == 'month' else 38000 if period == 'week' else 485000
+    }
+    
+    # Cleaner statistics
+    cleaner_stats = [
+        {
+            'name': 'Maria Rodriguez',
+            'job_count': 18 if period == 'month' else 5 if period == 'week' else 62,
+            'avg_time': 178,
+            'efficiency': 95,
+            'efficiency_class': 'good'
+        },
+        {
+            'name': 'James Wilson',
+            'job_count': 15 if period == 'month' else 4 if period == 'week' else 48,
+            'avg_time': 192,
+            'efficiency': 88,
+            'efficiency_class': 'good'
+        },
+        {
+            'name': 'Sarah Chen',
+            'job_count': 14 if period == 'month' else 3 if period == 'week' else 46,
+            'avg_time': 185,
+            'efficiency': 92,
+            'efficiency_class': 'good'
+        }
+    ]
+    
+    # Task performance data for charts
+    task_labels = ['Kitchen', 'Bathrooms', 'Living Areas', 'Bedrooms', 'Windows', 'Floors']
+    task_times = [45, 35, 30, 25, 20, 40]
+    
+    # Job type comparison
+    job_types = ['Move-in Ready', 'Final Clean', 'Rough Clean']
+    estimated_times = [180, 240, 300]
+    actual_times = [175, 252, 290]
+    
+    # Time distribution
+    time_distribution = [65, 20, 15]  # On time, Overtime, Under time
+    
+    # Task breakdown with performance metrics
+    task_breakdown = [
+        {
+            'name': 'Kitchen - All Surfaces',
+            'count': 47 if period == 'month' else 12 if period == 'week' else 156,
+            'avg_estimated': 45,
+            'avg_actual': 43,
+            'variance': -2,
+            'performance': 95
+        },
+        {
+            'name': 'Bathrooms - Complete',
+            'count': 94 if period == 'month' else 24 if period == 'week' else 312,
+            'avg_estimated': 35,
+            'avg_actual': 38,
+            'variance': 3,
+            'performance': 88
+        },
+        {
+            'name': 'Windows - Interior & Exterior',
+            'count': 47 if period == 'month' else 12 if period == 'week' else 156,
+            'avg_estimated': 20,
+            'avg_actual': 18,
+            'variance': -2,
+            'performance': 98
+        },
+        {
+            'name': 'Floors - Vacuum & Mop',
+            'count': 47 if period == 'month' else 12 if period == 'week' else 156,
+            'avg_estimated': 40,
+            'avg_actual': 42,
+            'variance': 2,
+            'performance': 90
+        },
+        {
+            'name': 'Bedrooms - All Areas',
+            'count': 141 if period == 'month' else 36 if period == 'week' else 468,
+            'avg_estimated': 25,
+            'avg_actual': 24,
+            'variance': -1,
+            'performance': 96
+        },
+        {
+            'name': 'Living Areas - Complete',
+            'count': 47 if period == 'month' else 12 if period == 'week' else 156,
+            'avg_estimated': 30,
+            'avg_actual': 32,
+            'variance': 2,
+            'performance': 89
+        }
+    ]
+    
+    return render_template('performance.html',
+                         period=period,
+                         period_label=period_label,
+                         metrics=metrics,
+                         cleaner_stats=cleaner_stats,
+                         task_labels=task_labels,
+                         task_times=task_times,
+                         job_types=job_types,
+                         estimated_times=estimated_times,
+                         actual_times=actual_times,
+                         time_distribution=time_distribution,
+                         task_breakdown=task_breakdown)
+
 @app.route('/submitted')
 def submitted():
     """Results page - redirect to home if accessed directly"""
