@@ -169,6 +169,95 @@
             </div>
         </div>
 
+        <!-- Exceptions and Issues -->
+        {% if job_data.exceptions %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning bg-opacity-10">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                            Exceptions & Issues Notations
+                        </h3>
+                        <p class="mb-0 mt-2"><small class="text-muted">Issues that could not be resolved during cleaning and require follow-up</small></p>
+                    </div>
+                    <div class="card-body">
+                        {% for exception in job_data.exceptions %}
+                        <div class="card mb-3 border-warning">
+                            <div class="card-header">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h5 class="mb-1">
+                                            {{ exception.issue_type }}
+                                        </h5>
+                                        <p class="mb-1"><strong>Task:</strong> {{ exception.task_name }}</p>
+                                        <small class="text-muted">
+                                            <i class="fas fa-clock me-1"></i>{{ exception.timestamp }}
+                                            {% if exception.cleaner_initials %}
+                                            | <i class="fas fa-user me-1"></i>{{ exception.cleaner_initials }}
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                    <div class="text-end">
+                                        {% if exception.notified_client %}
+                                        <span class="badge bg-info">Client Notified</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Client Not Notified</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <h6><i class="fas fa-info-circle me-2"></i>Description:</h6>
+                                        <p>{{ exception.description }}</p>
+                                        
+                                        {% if exception.recommended_action %}
+                                        <h6><i class="fas fa-lightbulb me-2"></i>Recommended Action:</h6>
+                                        <p class="text-primary">{{ exception.recommended_action }}</p>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-4">
+                                        {% if exception.exception_photo %}
+                                        <h6><i class="fas fa-camera me-2"></i>Photo Evidence:</h6>
+                                        <img src="{{ url_for('static', filename='uploads/' + exception.exception_photo) }}" 
+                                             class="img-fluid rounded border" 
+                                             style="max-height: 200px; object-fit: cover;"
+                                             alt="Exception photo evidence">
+                                        {% else %}
+                                        <div class="text-center text-muted">
+                                            <i class="fas fa-camera fa-2x mb-2"></i>
+                                            <p>No photo evidence</p>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                        <!-- Exceptions Summary -->
+                        <div class="alert alert-warning">
+                            <h5><i class="fas fa-clipboard-list me-2"></i>Exception Summary</h5>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <strong>Total Exceptions:</strong> {{ job_data.exceptions|length }}
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>Client Notified:</strong> {{ job_data.exceptions | selectattr('notified_client') | list | length }}
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>With Photos:</strong> {{ job_data.exceptions | selectattr('exception_photo') | list | length }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Action Buttons -->
         <div class="row mb-4">
             <div class="col-12 text-center">

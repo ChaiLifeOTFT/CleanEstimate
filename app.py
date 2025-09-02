@@ -210,7 +210,8 @@ def submit_job():
             'total_estimated_minutes': round(total_estimated_minutes, 1),
             'total_estimated_hours': total_estimated_hours,
             'current_task_index': 0,
-            'completed_tasks': []
+            'completed_tasks': [],
+            'exceptions': []  # Store exceptions and issues
         }
         
         # Redirect to first task
@@ -306,6 +307,68 @@ def complete_task(task_index):
     except Exception as e:
         app.logger.error(f"Error completing task: {str(e)}")
         flash('An error occurred while completing the task. Please try again.', 'error')
+        return redirect(url_for('task_page', task_index=task_index))
+
+@app.route('/add_exception/<int:task_index>', methods=['POST'])
+def add_exception(task_index):
+    """Add an exception/issue for a specific task"""
+    if 'job_data' not in session:
+        flash('No active job found. Please start a new job.', 'error')
+        return redirect(url_for('index'))
+    
+    try:
+        job_data = session['job_data']
+        tasks = job_data['tasks']
+        
+        if task_index >= len(tasks):
+            flash('Invalid task index.', 'error')
+            return redirect(url_for('job_complete'))
+        
+        # Get exception data from form
+        issue_type = request.form.get('issue_type', '').strip()
+        description = request.form.get('description', '').strip()
+        recommended_action = request.form.get('recommended_action', '').strip()
+        notified_client = request.form.get('notified_client') == 'yes'
+        cleaner_initials = request.form.get('cleaner_initials', '').strip()
+        
+        if not all([issue_type, description]):
+            flash('Issue type and description are required.', 'error')
+            return redirect(url_for('task_page', task_index=task_index))
+        
+        # Handle exception photo upload
+        exception_photo_filename = None
+        if 'exception_photo' in request.files:
+            exception_file = request.files['exception_photo']
+            if exception_file and exception_file.filename and allowed_file(exception_file.filename):
+                file_extension = exception_file.filename.rsplit('.', 1)[1].lower()
+                exception_photo_filename = f"exception_{task_index}_{uuid.uuid4()}.{file_extension}"
+                exception_file.save(os.path.join(app.config['UPLOAD_FOLDER'], exception_photo_filename))
+        
+        # Create exception record
+        from datetime import datetime
+        exception_record = {
+            'task_index': task_index,
+            'task_name': tasks[task_index]['task'],
+            'issue_type': issue_type,
+            'description': description,
+            'recommended_action': recommended_action,
+            'notified_client': notified_client,
+            'cleaner_initials': cleaner_initials,
+            'exception_photo': exception_photo_filename,
+            'timestamp': datetime.now().strftime('%Y-%m-%d %I:%M%p'),
+            'exception_id': str(uuid.uuid4())
+        }
+        
+        # Add to exceptions list
+        job_data['exceptions'].append(exception_record)
+        session['job_data'] = job_data
+        
+        flash('Exception documented successfully.', 'success')
+        return redirect(url_for('task_page', task_index=task_index))
+        
+    except Exception as e:
+        app.logger.error(f"Error adding exception: {str(e)}")
+        flash('An error occurred while documenting the exception. Please try again.', 'error')
         return redirect(url_for('task_page', task_index=task_index))
 
 @app.route('/job_complete')

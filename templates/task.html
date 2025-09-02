@@ -121,6 +121,10 @@
                                     <i class="fas fa-check me-2"></i>
                                     Complete Task & Continue
                                 </button>
+                                <button type="button" class="btn btn-warning btn-lg" data-bs-toggle="modal" data-bs-target="#exceptionModal">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    Report Exception/Issue
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -135,6 +139,123 @@
                     <i class="fas fa-home me-2"></i>
                     Cancel Job
                 </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Exception Modal -->
+    <div class="modal fade" id="exceptionModal" tabindex="-1" aria-labelledby="exceptionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exceptionModalLabel">
+                        <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                        Report Exception/Issue
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="{{ url_for('add_exception', task_index=task_index) }}" method="POST" enctype="multipart/form-data" id="exceptionForm">
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Task:</strong> {{ task.task }}
+                        </div>
+                        
+                        <!-- Issue Type -->
+                        <div class="mb-3">
+                            <label for="issue_type" class="form-label">
+                                <i class="fas fa-tag me-1"></i>
+                                Issue Type *
+                            </label>
+                            <select class="form-select" id="issue_type" name="issue_type" required>
+                                <option value="">Choose issue type...</option>
+                                <option value="🚫 Access Blocked">🚫 Access Blocked</option>
+                                <option value="🧰 Trade Damage">🧰 Trade Damage</option>
+                                <option value="📝 Not in Scope">📝 Not in Scope</option>
+                                <option value="⚠️ Safety Risk">⚠️ Safety Risk</option>
+                                <option value="🔧 Equipment Issue">🔧 Equipment Issue</option>
+                                <option value="🏗️ Construction Delay">🏗️ Construction Delay</option>
+                                <option value="🔍 Quality Issue">🔍 Quality Issue</option>
+                                <option value="📦 Materials Missing">📦 Materials Missing</option>
+                            </select>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="mb-3">
+                            <label for="description" class="form-label">
+                                <i class="fas fa-edit me-1"></i>
+                                Description of Issue *
+                            </label>
+                            <textarea class="form-control" id="description" name="description" rows="3" required 
+                                      placeholder="Describe what happened and why the task couldn't be completed as planned..."></textarea>
+                        </div>
+
+                        <!-- Exception Photo -->
+                        <div class="mb-3">
+                            <label for="exception_photo" class="form-label">
+                                <i class="fas fa-camera me-1"></i>
+                                Photo Evidence
+                            </label>
+                            <input type="file" class="form-control" id="exception_photo" name="exception_photo" accept="image/*">
+                            <div class="form-text">Upload a photo showing the issue or problem area</div>
+                            
+                            <!-- Preview area -->
+                            <div id="exception_preview" class="mt-2" style="display: none;">
+                                <img id="exception_img" class="img-fluid rounded border" style="max-height: 200px;" alt="Exception photo preview">
+                            </div>
+                        </div>
+
+                        <!-- Recommended Action -->
+                        <div class="mb-3">
+                            <label for="recommended_action" class="form-label">
+                                <i class="fas fa-lightbulb me-1"></i>
+                                Recommended Action
+                            </label>
+                            <textarea class="form-control" id="recommended_action" name="recommended_action" rows="2" 
+                                      placeholder="What should be done to resolve this issue? (e.g., 'Reclean after plumber finishes', 'Builder needs to repair')"></textarea>
+                        </div>
+
+                        <div class="row">
+                            <!-- Notified Client -->
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-phone me-1"></i>
+                                    Notified Client?
+                                </label>
+                                <div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="notified_client" id="notified_yes" value="yes">
+                                        <label class="form-check-label" for="notified_yes">Yes</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" name="notified_client" id="notified_no" value="no" checked>
+                                        <label class="form-check-label" for="notified_no">No</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Cleaner Initials -->
+                            <div class="col-md-6 mb-3">
+                                <label for="cleaner_initials" class="form-label">
+                                    <i class="fas fa-signature me-1"></i>
+                                    Your Initials
+                                </label>
+                                <input type="text" class="form-control" id="cleaner_initials" name="cleaner_initials" 
+                                       maxlength="5" placeholder="JD" value="{{ job_data.cleaner_name[:2].upper() if job_data.cleaner_name else '' }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-2"></i>
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-save me-2"></i>
+                            Document Exception
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -183,6 +304,27 @@
                 reader.readAsDataURL(file);
             } else {
                 document.getElementById('after_preview').style.display = 'none';
+            }
+        });
+
+        // Exception photo preview
+        document.getElementById('exception_photo').addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                if (file.size > 16 * 1024 * 1024) {
+                    alert('File is too large. Maximum file size is 16MB.');
+                    this.value = '';
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('exception_img').src = e.target.result;
+                    document.getElementById('exception_preview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                document.getElementById('exception_preview').style.display = 'none';
             }
         });
 
