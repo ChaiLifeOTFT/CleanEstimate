@@ -101,8 +101,58 @@
             </div>
         </div>
 
-        <!-- Task Completion Form -->
+        <!-- Task Timer Section -->
         <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-info">
+                    <div class="card-header bg-info bg-opacity-10">
+                        <h4 class="card-title mb-0">
+                            <i class="fas fa-stopwatch me-2"></i>
+                            Task Timer
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center mb-4">
+                            <h2 id="timer-display" class="display-4 mb-2">00:00:00</h2>
+                            <p class="text-muted">
+                                Estimated Time: <span class="badge bg-secondary">{{ task.estimated_minutes }} minutes</span>
+                            </p>
+                            <div id="overtime-alert" class="alert alert-warning mt-3" style="display: none;">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Time Exceeded!</strong> This task is taking longer than estimated.
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="button" id="start-task-btn" class="btn btn-primary btn-lg">
+                                <i class="fas fa-play me-2"></i>
+                                Start Task
+                            </button>
+                            <div id="timer-running-btns" style="display: none;">
+                                <div class="d-grid gap-2">
+                                    <button type="button" class="btn btn-warning btn-lg" data-bs-toggle="modal" data-bs-target="#timeExtensionModal">
+                                        <i class="fas fa-clock me-2"></i>
+                                        Request More Time
+                                    </button>
+                                    <button type="button" id="stop-task-btn" class="btn btn-success btn-lg">
+                                        <i class="fas fa-stop me-2"></i>
+                                        Stop Timer & Continue
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="time-extensions" class="mt-3" style="display: none;">
+                            <h6><i class="fas fa-history me-2"></i>Time Extensions:</h6>
+                            <ul id="extensions-list" class="list-unstyled"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Completion Form -->
+        <div class="row mb-4" id="task-documentation" style="display: none;">
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
@@ -169,6 +219,41 @@
                     <i class="fas fa-home me-2"></i>
                     Cancel Job
                 </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Time Extension Modal -->
+    <div class="modal fade" id="timeExtensionModal" tabindex="-1" aria-labelledby="timeExtensionModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="timeExtensionModalLabel">
+                        <i class="fas fa-clock text-warning me-2"></i>
+                        Request More Time
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="extension-reason" class="form-label">Reason for Extension:</label>
+                        <select class="form-select" id="extension-reason">
+                            <option value="Task more complex than expected">Task more complex than expected</option>
+                            <option value="Additional cleaning required">Additional cleaning required</option>
+                            <option value="Waiting for area to dry">Waiting for area to dry</option>
+                            <option value="Equipment issue">Equipment issue</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="extension-minutes" class="form-label">Additional Minutes Needed:</label>
+                        <input type="number" class="form-control" id="extension-minutes" value="5" min="1" max="30">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-warning" id="submit-extension">Request Extension</button>
+                </div>
             </div>
         </div>
     </div>
@@ -362,6 +447,170 @@
         document.getElementById('taskForm').addEventListener('submit', function(e) {
             // Optional: Add validation or confirmation here
         });
+
+        // Timer functionality
+        let timerInterval = null;
+        let startTime = null;
+        let elapsedTime = 0;
+        let isRunning = false;
+        const taskIndex = {{ task_index }};
+        const estimatedMinutes = {{ task.estimated_minutes }};
+        let overtimeAlertShown = false;
+
+        // Format time display
+        function formatTime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Update timer display
+        function updateTimer() {
+            const now = Date.now();
+            elapsedTime = Math.floor((now - startTime) / 1000);
+            document.getElementById('timer-display').textContent = formatTime(elapsedTime);
+            
+            // Check if overtime
+            const elapsedMinutes = elapsedTime / 60;
+            if (elapsedMinutes > estimatedMinutes && !overtimeAlertShown) {
+                document.getElementById('overtime-alert').style.display = 'block';
+                // Play alert sound if available
+                const audio = new Audio('data:audio/wav;base64,UklGRhwMAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoMAACAhICCgICAgICA');
+                audio.play().catch(e => console.log('Audio play failed'));
+                overtimeAlertShown = true;
+            }
+        }
+
+        // Start task timer
+        document.getElementById('start-task-btn').addEventListener('click', async function() {
+            try {
+                const response = await fetch(`/start_task/${taskIndex}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    startTime = Date.now();
+                    isRunning = true;
+                    
+                    // Update UI
+                    document.getElementById('start-task-btn').style.display = 'none';
+                    document.getElementById('timer-running-btns').style.display = 'block';
+                    
+                    // Start interval timer
+                    timerInterval = setInterval(updateTimer, 1000);
+                } else {
+                    alert('Failed to start timer. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error starting timer:', error);
+                alert('An error occurred while starting the timer.');
+            }
+        });
+
+        // Stop task timer
+        document.getElementById('stop-task-btn').addEventListener('click', async function() {
+            if (!isRunning) return;
+            
+            try {
+                const response = await fetch(`/stop_task/${taskIndex}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    isRunning = false;
+                    clearInterval(timerInterval);
+                    
+                    // Show documentation section
+                    document.getElementById('task-documentation').style.display = 'block';
+                    document.getElementById('timer-running-btns').style.display = 'none';
+                    
+                    // Update timer display to show final time
+                    const finalMinutes = Math.round(data.actual_minutes);
+                    const overUnder = finalMinutes - estimatedMinutes;
+                    let statusText = `Task completed in ${finalMinutes} minutes`;
+                    if (overUnder > 0) {
+                        statusText += ` (${overUnder} minutes over estimate)`;
+                    } else if (overUnder < 0) {
+                        statusText += ` (${Math.abs(overUnder)} minutes under estimate)`;
+                    }
+                    
+                    // Replace timer with completion message
+                    document.querySelector('#timer-display').insertAdjacentHTML('afterend', 
+                        `<p class="text-success mt-2">${statusText}</p>`);
+                    
+                } else {
+                    alert('Failed to stop timer. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error stopping timer:', error);
+                alert('An error occurred while stopping the timer.');
+            }
+        });
+
+        // Request time extension
+        document.getElementById('submit-extension').addEventListener('click', async function() {
+            const reason = document.getElementById('extension-reason').value;
+            const additionalMinutes = parseInt(document.getElementById('extension-minutes').value);
+            
+            try {
+                const response = await fetch(`/request_more_time/${taskIndex}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        reason: reason,
+                        additional_minutes: additionalMinutes
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Update extensions list
+                    document.getElementById('time-extensions').style.display = 'block';
+                    const extensionsList = document.getElementById('extensions-list');
+                    const extensionItem = document.createElement('li');
+                    extensionItem.innerHTML = `<small class="text-muted">+${additionalMinutes} min - ${reason}</small>`;
+                    extensionsList.appendChild(extensionItem);
+                    
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('timeExtensionModal'));
+                    modal.hide();
+                    
+                    // Reset overtime alert
+                    overtimeAlertShown = false;
+                    document.getElementById('overtime-alert').style.display = 'none';
+                } else {
+                    alert('Failed to request extension. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error requesting extension:', error);
+                alert('An error occurred while requesting more time.');
+            }
+        });
+
+        // Check if timer was already running (page refresh)
+        {% if timer_data and timer_data.status == 'running' %}
+        window.addEventListener('load', function() {
+            startTime = new Date('{{ timer_data.start_time }}').getTime();
+            isRunning = true;
+            document.getElementById('start-task-btn').style.display = 'none';
+            document.getElementById('timer-running-btns').style.display = 'block';
+            timerInterval = setInterval(updateTimer, 1000);
+            
+            // Show extensions if any
+            {% if timer_data.time_extensions %}
+            document.getElementById('time-extensions').style.display = 'block';
+            {% for ext in timer_data.time_extensions %}
+            document.getElementById('extensions-list').innerHTML += '<li><small class="text-muted">+{{ ext.additional_minutes }} min - {{ ext.reason }}</small></li>';
+            {% endfor %}
+            {% endif %}
+        });
+        {% endif %}
     </script>
 </body>
 </html>

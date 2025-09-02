@@ -285,7 +285,8 @@ def submit_job():
             'total_estimated_hours': total_estimated_hours,
             'current_task_index': 0,
             'completed_tasks': [],
-            'exceptions': []  # Store exceptions and issues
+            'exceptions': [],  # Store exceptions and issues
+            'task_timers': {}  # Store timer data for each task
         }
         
         # Redirect to first task
@@ -317,11 +318,15 @@ def task_page(task_index):
         'percentage': round(((task_index) / len(tasks)) * 100)
     }
     
+    # Get timer data for this task if it exists
+    timer_data = job_data.get('task_timers', {}).get(str(task_index), None)
+    
     return render_template('task.html', 
                          task=current_task, 
                          task_index=task_index,
                          job_data=job_data, 
-                         progress=progress)
+                         progress=progress,
+                         timer_data=timer_data)
 
 @app.route('/complete_task/<int:task_index>', methods=['POST'])
 def complete_task(task_index):
@@ -357,11 +362,18 @@ def complete_task(task_index):
                 after_photo_filename = f"task_{task_index}_after_{uuid.uuid4()}.{file_extension}"
                 after_file.save(os.path.join(app.config['UPLOAD_FOLDER'], after_photo_filename))
         
+        # Get timer data if exists
+        timer_data = job_data.get('task_timers', {}).get(str(task_index), {})
+        actual_minutes = timer_data.get('actual_minutes', current_task['estimated_minutes'])
+        time_extensions = timer_data.get('time_extensions', [])
+        
         # Store task completion data
         completed_task = {
             'task_index': task_index,
             'task_name': current_task['task'],
             'estimated_minutes': current_task['estimated_minutes'],
+            'actual_minutes': actual_minutes,
+            'time_extensions': time_extensions,
             'before_photo': before_photo_filename,
             'after_photo': after_photo_filename,
             'completed_at': str(uuid.uuid4())  # Simple timestamp placeholder
@@ -382,6 +394,93 @@ def complete_task(task_index):
         app.logger.error(f"Error completing task: {str(e)}")
         flash('An error occurred while completing the task. Please try again.', 'error')
         return redirect(url_for('task_page', task_index=task_index))
+
+@app.route('/start_task/<int:task_index>', methods=['POST'])
+def start_task(task_index):
+    """Start timer for a specific task"""
+    if 'job_data' not in session:
+        return {'error': 'No active job found'}, 400
+    
+    try:
+        from datetime import datetime
+        job_data = session['job_data']
+        
+        # Initialize task_timers if not exists
+        if 'task_timers' not in job_data:
+            job_data['task_timers'] = {}
+        
+        # Start timer for this task
+        job_data['task_timers'][str(task_index)] = {
+            'start_time': datetime.now().isoformat(),
+            'status': 'running',
+            'time_extensions': [],
+            'actual_minutes': 0
+        }
+        
+        session['job_data'] = job_data
+        return {'success': True, 'start_time': job_data['task_timers'][str(task_index)]['start_time']}, 200
+    except Exception as e:
+        app.logger.error(f"Error starting task timer: {str(e)}")
+        return {'error': str(e)}, 500
+
+@app.route('/request_more_time/<int:task_index>', methods=['POST'])
+def request_more_time(task_index):
+    """Request more time for a task"""
+    if 'job_data' not in session:
+        return {'error': 'No active job found'}, 400
+    
+    try:
+        from datetime import datetime
+        job_data = session['job_data']
+        reason = request.json.get('reason', 'Additional time needed')
+        additional_minutes = request.json.get('additional_minutes', 5)
+        
+        if str(task_index) in job_data.get('task_timers', {}):
+            extension = {
+                'timestamp': datetime.now().isoformat(),
+                'reason': reason,
+                'additional_minutes': additional_minutes
+            }
+            job_data['task_timers'][str(task_index)]['time_extensions'].append(extension)
+            session['job_data'] = job_data
+            return {'success': True, 'extension': extension}, 200
+        else:
+            return {'error': 'Task timer not started'}, 400
+            
+    except Exception as e:
+        app.logger.error(f"Error requesting more time: {str(e)}")
+        return {'error': str(e)}, 500
+
+@app.route('/stop_task/<int:task_index>', methods=['POST'])
+def stop_task(task_index):
+    """Stop timer for a specific task"""
+    if 'job_data' not in session:
+        return {'error': 'No active job found'}, 400
+    
+    try:
+        from datetime import datetime
+        job_data = session['job_data']
+        
+        if str(task_index) in job_data.get('task_timers', {}):
+            timer_data = job_data['task_timers'][str(task_index)]
+            if timer_data['status'] == 'running':
+                # Calculate actual time taken
+                start_time = datetime.fromisoformat(timer_data['start_time'])
+                end_time = datetime.now()
+                actual_minutes = (end_time - start_time).total_seconds() / 60
+                
+                timer_data['end_time'] = end_time.isoformat()
+                timer_data['actual_minutes'] = round(actual_minutes, 1)
+                timer_data['status'] = 'completed'
+                
+                session['job_data'] = job_data
+                return {'success': True, 'actual_minutes': timer_data['actual_minutes']}, 200
+        
+        return {'error': 'Task timer not found'}, 400
+            
+    except Exception as e:
+        app.logger.error(f"Error stopping task timer: {str(e)}")
+        return {'error': str(e)}, 500
 
 @app.route('/add_exception/<int:task_index>', methods=['POST'])
 def add_exception(task_index):

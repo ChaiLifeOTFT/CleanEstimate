@@ -113,7 +113,19 @@
                                     <i class="fas fa-check-square text-success me-2"></i>
                                     Task {{ completed_task.task_index + 1 }}: {{ completed_task.task_name }}
                                 </h5>
-                                <span class="badge bg-info">{{ completed_task.estimated_minutes }} min</span>
+                                <div>
+                                    <span class="badge bg-secondary">Est: {{ completed_task.estimated_minutes }} min</span>
+                                    {% if completed_task.actual_minutes %}
+                                    <span class="badge {% if completed_task.actual_minutes > completed_task.estimated_minutes %}bg-warning{% else %}bg-success{% endif %}">
+                                        Actual: {{ completed_task.actual_minutes }} min
+                                    </span>
+                                    {% endif %}
+                                    {% if completed_task.time_extensions %}
+                                    <span class="badge bg-info" title="{{ completed_task.time_extensions|length }} extensions">
+                                        <i class="fas fa-clock"></i> +{{ completed_task.time_extensions|sum(attribute='additional_minutes', default=0) }} min
+                                    </span>
+                                    {% endif %}
+                                </div>
                             </div>
                             <div class="card-body">
                                 {% if completed_task.before_photo or completed_task.after_photo %}
@@ -152,15 +164,25 @@
                                     Job Completed Successfully
                                 </h4>
                                 <div class="row">
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <h5 class="text-success">{{ job_data.completed_tasks|length }}</h5>
                                         <p class="mb-0">Tasks Completed</p>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
+                                        <h5 class="text-info">{{ job_data.total_estimated_hours }}</h5>
+                                        <p class="mb-0">Estimated Hours</p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        {% set actual_total = job_data.completed_tasks | sum(attribute='actual_minutes', default=0) %}
+                                        {% if actual_total > 0 %}
+                                        <h5 class="text-warning">{{ (actual_total / 60) | round(2) }}</h5>
+                                        <p class="mb-0">Actual Hours</p>
+                                        {% else %}
                                         <h5 class="text-success">{{ job_data.total_estimated_hours }}</h5>
                                         <p class="mb-0">Total Hours</p>
+                                        {% endif %}
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <h5 class="text-success">{{ (job_data.completed_tasks | selectattr('before_photo') | list | length) + (job_data.completed_tasks | selectattr('after_photo') | list | length) }}</h5>
                                         <p class="mb-0">Photos Documented</p>
                                     </div>
