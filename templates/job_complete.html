@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Complete - Drake's Precision Cleaning App</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <h1 class="display-4 mb-2">
+                    <i class="fas fa-check-circle text-success me-3"></i>
+                    Job Complete!
+                </h1>
+                <p class="lead text-muted">All cleaning tasks have been documented and completed</p>
+            </div>
+        </div>
+
+        <!-- Job Summary -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Job Summary
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong><i class="fas fa-user me-2"></i>Client:</strong> {{ job_data.client_name }}</p>
+                                <p><strong><i class="fas fa-map-marker-alt me-2"></i>Address:</strong> {{ job_data.job_address }}</p>
+                                <p><strong><i class="fas fa-user-tie me-2"></i>Cleaner:</strong> {{ job_data.cleaner_name }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong><i class="fas fa-ruler-combined me-2"></i>Square Footage:</strong> {{ "{:,}".format(job_data.square_footage) }} sq ft</p>
+                                <p><strong><i class="fas fa-list me-2"></i>Cleaning Type:</strong> {{ job_data.cleaning_type }}</p>
+                                <p><strong><i class="fas fa-clock me-2"></i>Total Estimated Time:</strong> 
+                                    <span class="badge bg-primary fs-6">{{ job_data.total_estimated_hours }} hours ({{ job_data.total_estimated_minutes }} minutes)</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overall Job Photos -->
+        {% if job_data.job_before_photo or job_data.job_after_photo %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-camera me-2"></i>
+                            Overall Job Photos
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% if job_data.job_before_photo %}
+                            <div class="col-md-6 mb-3">
+                                <h5><i class="fas fa-image me-2"></i>Job Before Photo</h5>
+                                <div class="text-center">
+                                    <img src="{{ url_for('static', filename='uploads/' + job_data.job_before_photo) }}" 
+                                         class="img-fluid rounded border" 
+                                         style="max-height: 300px; object-fit: cover;"
+                                         alt="Before cleaning photo">
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if job_data.job_after_photo %}
+                            <div class="col-md-6 mb-3">
+                                <h5><i class="fas fa-image me-2"></i>Job After Photo</h5>
+                                <div class="text-center">
+                                    <img src="{{ url_for('static', filename='uploads/' + job_data.job_after_photo) }}" 
+                                         class="img-fluid rounded border" 
+                                         style="max-height: 300px; object-fit: cover;"
+                                         alt="After cleaning photo">
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Completed Tasks with Individual Photos -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-tasks me-2"></i>
+                            Completed Tasks with Documentation
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        {% for completed_task in job_data.completed_tasks %}
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-check-square text-success me-2"></i>
+                                    Task {{ completed_task.task_index + 1 }}: {{ completed_task.task_name }}
+                                </h5>
+                                <span class="badge bg-info">{{ completed_task.estimated_minutes }} min</span>
+                            </div>
+                            <div class="card-body">
+                                {% if completed_task.before_photo or completed_task.after_photo %}
+                                <div class="row">
+                                    {% if completed_task.before_photo %}
+                                    <div class="col-md-6 mb-2">
+                                        <h6><i class="fas fa-image me-2"></i>Before:</h6>
+                                        <img src="{{ url_for('static', filename='uploads/' + completed_task.before_photo) }}" 
+                                             class="img-fluid rounded border" 
+                                             style="max-height: 200px; object-fit: cover;"
+                                             alt="Task before photo">
+                                    </div>
+                                    {% endif %}
+                                    {% if completed_task.after_photo %}
+                                    <div class="col-md-6 mb-2">
+                                        <h6><i class="fas fa-image me-2"></i>After:</h6>
+                                        <img src="{{ url_for('static', filename='uploads/' + completed_task.after_photo) }}" 
+                                             class="img-fluid rounded border" 
+                                             style="max-height: 200px; object-fit: cover;"
+                                             alt="Task after photo">
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% else %}
+                                <p class="text-muted mb-0"><i class="fas fa-info-circle me-2"></i>No photos uploaded for this task</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                        <!-- Summary Stats -->
+                        <div class="card bg-success bg-opacity-10 border-success">
+                            <div class="card-body text-center">
+                                <h4>
+                                    <i class="fas fa-trophy text-success me-2"></i>
+                                    Job Completed Successfully
+                                </h4>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <h5 class="text-success">{{ job_data.completed_tasks|length }}</h5>
+                                        <p class="mb-0">Tasks Completed</p>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h5 class="text-success">{{ job_data.total_estimated_hours }}</h5>
+                                        <p class="mb-0">Total Hours</p>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <h5 class="text-success">{{ (job_data.completed_tasks | selectattr('before_photo') | list | length) + (job_data.completed_tasks | selectattr('after_photo') | list | length) }}</h5>
+                                        <p class="mb-0">Photos Documented</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg me-2">
+                    <i class="fas fa-plus me-2"></i>
+                    Start New Job
+                </a>
+                <button onclick="window.print()" class="btn btn-outline-primary btn-lg">
+                    <i class="fas fa-print me-2"></i>
+                    Print Job Report
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="row">
+            <div class="col-12 text-center">
+                <div class="card">
+                    <div class="card-body">
+                        <p class="mb-0 text-muted">
+                            <i class="fas fa-broom me-2"></i>
+                            Drake's Precision Cleaning - Professional Service Documentation
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Print Styles -->
+    <style>
+        @media print {
+            .btn {
+                display: none !important;
+            }
+            .card {
+                border: 1px solid #000 !important;
+                page-break-inside: avoid;
+            }
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            .text-muted {
+                color: #666 !important;
+            }
+            .bg-success {
+                background-color: #e7f3e7 !important;
+            }
+            .text-success {
+                color: #2d5a2d !important;
+            }
+        }
+    </style>
+</body>
+</html>

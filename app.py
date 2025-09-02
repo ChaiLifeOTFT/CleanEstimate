@@ -1,8 +1,9 @@
 import os
 import logging
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from werkzeug.utils import secure_filename
 import uuid
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -130,8 +131,9 @@ def calculate_task_times(cleaning_type, square_footage):
     
     for task in tasks:
         # Calculate time based on square footage
-        # Formula: (square_footage / 100) * time_per_100
-        estimated_minutes = (square_footage / 100) * task["time_per_100"]
+        # Formula: (square_footage / 100) * time_per_100 + 5 minute buffer
+        base_minutes = (square_footage / 100) * task["time_per_100"]
+        estimated_minutes = base_minutes + 5  # Add 5 minute cleaning window buffer
         
         calculated_task = {
             "task": task["task"],
@@ -195,26 +197,126 @@ def submit_job():
         total_estimated_minutes = sum(task['estimated_minutes'] for task in calculated_tasks)
         total_estimated_hours = round(total_estimated_minutes / 60, 2)
         
-        # Prepare data for results page
-        job_data = {
+        # Store job data in session for individual task workflow
+        session['job_data'] = {
             'client_name': client_name,
             'job_address': job_address,
             'cleaner_name': cleaner_name,
             'square_footage': square_footage,
             'cleaning_type': cleaning_type,
-            'before_photo': before_photo_filename,
-            'after_photo': after_photo_filename,
+            'job_before_photo': before_photo_filename,
+            'job_after_photo': after_photo_filename,
             'tasks': calculated_tasks,
             'total_estimated_minutes': round(total_estimated_minutes, 1),
-            'total_estimated_hours': total_estimated_hours
+            'total_estimated_hours': total_estimated_hours,
+            'current_task_index': 0,
+            'completed_tasks': []
         }
         
-        return render_template('submitted.html', job_data=job_data)
+        # Redirect to first task
+        return redirect(url_for('task_page', task_index=0))
         
     except Exception as e:
         app.logger.error(f"Error processing job submission: {str(e)}")
         flash('An error occurred while processing your submission. Please try again.', 'error')
         return redirect(url_for('index'))
+
+@app.route('/task/<int:task_index>')
+def task_page(task_index):
+    """Individual task page with before/after photo uploads"""
+    if 'job_data' not in session:
+        flash('No active job found. Please start a new job.', 'error')
+        return redirect(url_for('index'))
+    
+    job_data = session['job_data']
+    tasks = job_data['tasks']
+    
+    if task_index >= len(tasks):
+        # All tasks completed, show summary
+        return redirect(url_for('job_complete'))
+    
+    current_task = tasks[task_index]
+    progress = {
+        'current': task_index + 1,
+        'total': len(tasks),
+        'percentage': round(((task_index) / len(tasks)) * 100)
+    }
+    
+    return render_template('task.html', 
+                         task=current_task, 
+                         task_index=task_index,
+                         job_data=job_data, 
+                         progress=progress)
+
+@app.route('/complete_task/<int:task_index>', methods=['POST'])
+def complete_task(task_index):
+    """Handle task completion with before/after photos"""
+    if 'job_data' not in session:
+        flash('No active job found. Please start a new job.', 'error')
+        return redirect(url_for('index'))
+    
+    try:
+        job_data = session['job_data']
+        tasks = job_data['tasks']
+        
+        if task_index >= len(tasks):
+            return redirect(url_for('job_complete'))
+        
+        current_task = tasks[task_index]
+        
+        # Handle before photo upload
+        before_photo_filename = None
+        if 'task_before_photo' in request.files:
+            before_file = request.files['task_before_photo']
+            if before_file and before_file.filename and allowed_file(before_file.filename):
+                file_extension = before_file.filename.rsplit('.', 1)[1].lower()
+                before_photo_filename = f"task_{task_index}_before_{uuid.uuid4()}.{file_extension}"
+                before_file.save(os.path.join(app.config['UPLOAD_FOLDER'], before_photo_filename))
+        
+        # Handle after photo upload
+        after_photo_filename = None
+        if 'task_after_photo' in request.files:
+            after_file = request.files['task_after_photo']
+            if after_file and after_file.filename and allowed_file(after_file.filename):
+                file_extension = after_file.filename.rsplit('.', 1)[1].lower()
+                after_photo_filename = f"task_{task_index}_after_{uuid.uuid4()}.{file_extension}"
+                after_file.save(os.path.join(app.config['UPLOAD_FOLDER'], after_photo_filename))
+        
+        # Store task completion data
+        completed_task = {
+            'task_index': task_index,
+            'task_name': current_task['task'],
+            'estimated_minutes': current_task['estimated_minutes'],
+            'before_photo': before_photo_filename,
+            'after_photo': after_photo_filename,
+            'completed_at': str(uuid.uuid4())  # Simple timestamp placeholder
+        }
+        
+        job_data['completed_tasks'].append(completed_task)
+        job_data['current_task_index'] = task_index + 1
+        session['job_data'] = job_data
+        
+        # Move to next task
+        next_task_index = task_index + 1
+        if next_task_index >= len(tasks):
+            return redirect(url_for('job_complete'))
+        else:
+            return redirect(url_for('task_page', task_index=next_task_index))
+            
+    except Exception as e:
+        app.logger.error(f"Error completing task: {str(e)}")
+        flash('An error occurred while completing the task. Please try again.', 'error')
+        return redirect(url_for('task_page', task_index=task_index))
+
+@app.route('/job_complete')
+def job_complete():
+    """Job completion summary page"""
+    if 'job_data' not in session:
+        flash('No active job found. Please start a new job.', 'error')
+        return redirect(url_for('index'))
+    
+    job_data = session['job_data']
+    return render_template('job_complete.html', job_data=job_data)
 
 @app.route('/submitted')
 def submitted():

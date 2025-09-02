@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task {{ progress.current }} of {{ progress.total }} - Drake's Precision Cleaning App</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="display-6 mb-1">
+                            <i class="fas fa-tasks me-2"></i>
+                            {{ job_data.cleaning_type }}
+                        </h1>
+                        <p class="text-muted mb-0">{{ job_data.client_name }} - {{ job_data.job_address }}</p>
+                    </div>
+                    <div class="text-end">
+                        <h6 class="mb-1">Task {{ progress.current }} of {{ progress.total }}</h6>
+                        <div class="progress" style="width: 200px;">
+                            <div class="progress-bar" role="progressbar" style="width: {{ progress.percentage }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{% if category == 'error' %}danger{% else %}{{ category }}{% endif %} alert-dismissible fade show" role="alert">
+                        <i class="fas fa-{% if category == 'error' %}exclamation-triangle{% else %}info-circle{% endif %} me-2"></i>
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Current Task -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary bg-opacity-10">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-check-square me-2"></i>
+                            {{ task.task }}
+                        </h3>
+                        <div class="mt-2">
+                            <span class="badge bg-info me-2">
+                                <i class="fas fa-clock me-1"></i>
+                                {{ task.estimated_minutes }} minutes
+                            </span>
+                            <span class="badge bg-secondary">
+                                <i class="fas fa-home me-1"></i>
+                                {{ "{:,}".format(job_data.square_footage) }} sq ft
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <h5><i class="fas fa-list-ul me-2"></i>Instructions:</h5>
+                        <p class="lead">{{ task.instructions }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Completion Form -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title mb-0">
+                            <i class="fas fa-camera me-2"></i>
+                            Document This Task
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <form action="{{ url_for('complete_task', task_index=task_index) }}" method="POST" enctype="multipart/form-data" id="taskForm">
+                            <div class="row">
+                                <!-- Before Photo -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="task_before_photo" class="form-label">
+                                        <i class="fas fa-camera me-1"></i>
+                                        Before Photo
+                                    </label>
+                                    <input type="file" class="form-control" id="task_before_photo" name="task_before_photo" accept="image/*">
+                                    <div class="form-text">Upload a photo before starting this task</div>
+                                    
+                                    <!-- Preview area -->
+                                    <div id="before_preview" class="mt-2" style="display: none;">
+                                        <img id="before_img" class="img-fluid rounded border" style="max-height: 200px;" alt="Before photo preview">
+                                    </div>
+                                </div>
+                                
+                                <!-- After Photo -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="task_after_photo" class="form-label">
+                                        <i class="fas fa-camera me-1"></i>
+                                        After Photo
+                                    </label>
+                                    <input type="file" class="form-control" id="task_after_photo" name="task_after_photo" accept="image/*">
+                                    <div class="form-text">Upload a photo after completing this task</div>
+                                    
+                                    <!-- Preview area -->
+                                    <div id="after_preview" class="mt-2" style="display: none;">
+                                        <img id="after_img" class="img-fluid rounded border" style="max-height: 200px;" alt="After photo preview">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Submit Button -->
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="fas fa-check me-2"></i>
+                                    Complete Task & Continue
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="row">
+            <div class="col-12 text-center">
+                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-home me-2"></i>
+                    Cancel Job
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Photo Preview Script -->
+    <script>
+        // Before photo preview
+        document.getElementById('task_before_photo').addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                if (file.size > 16 * 1024 * 1024) {
+                    alert('File is too large. Maximum file size is 16MB.');
+                    this.value = '';
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('before_img').src = e.target.result;
+                    document.getElementById('before_preview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                document.getElementById('before_preview').style.display = 'none';
+            }
+        });
+
+        // After photo preview
+        document.getElementById('task_after_photo').addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                if (file.size > 16 * 1024 * 1024) {
+                    alert('File is too large. Maximum file size is 16MB.');
+                    this.value = '';
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('after_img').src = e.target.result;
+                    document.getElementById('after_preview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                document.getElementById('after_preview').style.display = 'none';
+            }
+        });
+
+        // Form submission
+        document.getElementById('taskForm').addEventListener('submit', function(e) {
+            // Optional: Add validation or confirmation here
+        });
+    </script>
+</body>
+</html>
