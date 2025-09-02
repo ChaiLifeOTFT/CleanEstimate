@@ -1,9 +1,12 @@
 import os
 import logging
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from werkzeug.utils import secure_filename
 import uuid
 import json
+import sys
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Email, To, Content
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -543,6 +546,118 @@ def add_exception(task_index):
         app.logger.error(f"Error adding exception: {str(e)}")
         flash('An error occurred while documenting the exception. Please try again.', 'error')
         return redirect(url_for('task_page', task_index=task_index))
+
+@app.route('/send_report', methods=['POST'])
+def send_report():
+    """Send job completion report via email"""
+    if 'job_data' not in session:
+        return jsonify({'error': 'No active job found'}), 400
+    
+    try:
+        job_data = session['job_data']
+        additional_email = request.json.get('additional_email', '').strip()
+        
+        # Get SendGrid API key
+        sendgrid_key = os.environ.get('SENDGRID_API_KEY')
+        if not sendgrid_key:
+            return jsonify({'error': 'Email service not configured'}), 500
+        
+        # Build email content
+        subject = f"🧼 Job Completed - {job_data['cleaning_type']} at {job_data['job_address']}"
+        
+        # Calculate actual vs estimated time
+        total_actual_minutes = sum(task.get('actual_minutes', task['estimated_minutes']) 
+                                  for task in job_data.get('completed_tasks', []))
+        actual_hours = round(total_actual_minutes / 60, 2)
+        
+        # Build HTML email body
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #333;">
+            <h2 style="color: #2c5530;">🧼 Job Completed - Drake's Precision Cleaning</h2>
+            
+            <h3>Job Details:</h3>
+            <ul>
+                <li><strong>Client:</strong> {job_data['client_name']}</li>
+                <li><strong>Cleaner:</strong> {job_data['cleaner_name']}</li>
+                <li><strong>Location:</strong> {job_data['job_address']}</li>
+                {'<li><strong>Lot Number:</strong> ' + job_data.get('lot_number', '') + '</li>' if job_data.get('lot_number') else ''}
+                <li><strong>Type:</strong> {job_data['cleaning_type']}</li>
+                <li><strong>Square Footage:</strong> {job_data['square_footage']:,} sq ft</li>
+                <li><strong>Estimated Time:</strong> {job_data['total_estimated_hours']} hours</li>
+                <li><strong>Actual Time:</strong> {actual_hours} hours</li>
+            </ul>
+            
+            <h3>Tasks Completed:</h3>
+            <ul>
+        """
+        
+        # Add task details
+        for task in job_data.get('completed_tasks', []):
+            actual_min = task.get('actual_minutes', task['estimated_minutes'])
+            status = "✅" if actual_min <= task['estimated_minutes'] else "⚠️"
+            html_content += f"<li>{status} <strong>{task['task_name']}:</strong> {actual_min:.1f} min (est: {task['estimated_minutes']} min)</li>"
+        
+        html_content += "</ul>"
+        
+        # Add exceptions if any
+        if job_data.get('exceptions'):
+            html_content += "<h3>⚠️ Exceptions & Issues:</h3><ul>"
+            for exc in job_data['exceptions']:
+                html_content += f"""
+                <li>
+                    <strong>{exc['issue_type']}</strong><br>
+                    {exc['description']}<br>
+                    <em>Action: {exc.get('recommended_action', 'None specified')}</em><br>
+                    <small>Reported by: {exc.get('cleaner_initials', 'Unknown')} | Client notified: {'Yes' if exc.get('notified_client') else 'No'}</small>
+                </li>
+                """
+            html_content += "</ul>"
+        
+        html_content += """
+            <hr>
+            <p style="color: #666; font-size: 12px;">
+                This report was generated automatically by Drake's Precision Cleaning App.<br>
+                For questions, please contact drakesprecisioncleaning@gmail.com
+            </p>
+        </body>
+        </html>
+        """
+        
+        # Create SendGrid message
+        sg = SendGridAPIClient(sendgrid_key)
+        
+        # Always send to company email
+        to_emails = [To('drakesprecisioncleaning@gmail.com')]
+        
+        # Add additional recipient if provided
+        if additional_email and '@' in additional_email:
+            to_emails.append(To(additional_email))
+        
+        message = Mail(
+            from_email=Email('noreply@drakesprecisionclean.com', 'Drake\'s Precision Cleaning'),
+            to_emails=to_emails,
+            subject=subject,
+            html_content=Content("text/html", html_content)
+        )
+        
+        # Send email
+        response = sg.send(message)
+        
+        if response.status_code in [200, 201, 202]:
+            recipients = 'drakesprecisioncleaning@gmail.com'
+            if additional_email:
+                recipients += f' and {additional_email}'
+            return jsonify({
+                'success': True, 
+                'message': f'Report sent successfully to {recipients}'
+            }), 200
+        else:
+            return jsonify({'error': 'Failed to send email'}), 500
+            
+    except Exception as e:
+        app.logger.error(f"Error sending report: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/job_complete')
 def job_complete():
