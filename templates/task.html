@@ -13,12 +13,15 @@
         <div class="row mb-4">
             <div class="col-12">
                 <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h1 class="display-6 mb-1">
-                            <i class="fas fa-tasks me-2"></i>
-                            {{ job_data.cleaning_type }}
-                        </h1>
-                        <p class="text-muted mb-0">{{ job_data.client_name }} - {{ job_data.job_address }}{% if job_data.lot_number %} (Lot: {{ job_data.lot_number }}){% endif %}</p>
+                    <div class="d-flex align-items-center">
+                        <img src="{{ url_for('static', filename='drake_logo.png') }}" alt="Drake's Precision Clean Logo" class="me-3" style="height: 60px;">
+                        <div>
+                            <h1 class="display-6 mb-1">
+                                <i class="fas fa-tasks me-2"></i>
+                                {{ job_data.cleaning_type }}
+                            </h1>
+                            <p class="text-muted mb-0">{{ job_data.client_name }} - {{ job_data.job_address }}{% if job_data.lot_number %} (Lot: {{ job_data.lot_number }}){% endif %}</p>
+                        </div>
                     </div>
                     <div class="text-end">
                         <h6 class="mb-1">Task {{ progress.current }} of {{ progress.total }}</h6>
