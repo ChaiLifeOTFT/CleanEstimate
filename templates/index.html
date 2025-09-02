@@ -6,6 +6,74 @@
     <title>Drake's Precision Cleaning App</title>
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Mobile Optimizations for Construction Site Use -->
+    <style>
+        /* Mobile-First Enhancements */
+        @media (max-width: 768px) {
+            /* Bigger touch targets for gloved hands */
+            .btn {
+                min-height: 60px !important;
+                font-size: 1.2rem !important;
+                padding: 15px 20px !important;
+            }
+            
+            .form-control, .form-select {
+                height: 55px !important;
+                font-size: 1.1rem !important;
+            }
+            
+            /* Better outdoor visibility */
+            .card {
+                box-shadow: 0 0 20px rgba(0,0,0,0.8) !important;
+                border: 2px solid var(--bs-primary) !important;
+            }
+            
+            /* Logo optimization for mobile */
+            .logo-img {
+                height: 150px !important;
+            }
+            
+            /* Stack form fields on mobile */
+            .col-md-6 {
+                margin-bottom: 1rem;
+            }
+            
+            /* Larger icons */
+            .fas, .far {
+                font-size: 1.3em;
+            }
+            
+            /* High contrast text */
+            .form-label {
+                font-weight: bold !important;
+                font-size: 1.1rem !important;
+            }
+        }
+        
+        /* Touch-friendly spacing */
+        .mb-3 {
+            margin-bottom: 1.5rem !important;
+        }
+        
+        /* High contrast for outdoor use */
+        .btn-primary {
+            background: linear-gradient(135deg, #0d6efd 0%, #0056e0 100%);
+            border: 2px solid #0056e0;
+            font-weight: bold;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #198754 0%, #157347 100%);
+            border: 2px solid #157347;
+            font-weight: bold;
+        }
+        
+        /* Loading states */
+        .btn:disabled {
+            opacity: 0.8;
+        }
+    </style>
 </head>
 <body>
     <div class="container mt-4">
@@ -13,7 +81,7 @@
         <div class="row mb-5">
             <div class="col-12 text-center">
                 <div class="mb-4">
-                    <img src="{{ url_for('static', filename='drake_logo.png') }}" alt="Drake's Precision Clean Logo" style="height: 250px; filter: drop-shadow(0 3px 6px rgba(255,255,255,0.15));">
+                    <img src="{{ url_for('static', filename='drake_logo.png') }}" alt="Drake's Precision Clean Logo" class="logo-img" style="height: 250px; filter: drop-shadow(0 3px 6px rgba(255,255,255,0.15));">
                 </div>
                 <p class="lead text-muted mt-3">Professional Job Time Estimation & Task Management</p>
             </div>
@@ -109,9 +177,10 @@
 
                             <!-- Submit Button -->
                             <div class="d-grid">
-                                <button type="submit" class="btn btn-primary btn-lg">
+                                <button type="submit" class="btn btn-primary btn-lg btn-block">
                                     <i class="fas fa-calculator me-2"></i>
-                                    Calculate Time Estimate
+                                    <span class="d-none d-sm-inline">Calculate Time Estimate</span>
+                                    <span class="d-sm-none">Start Job</span>
                                 </button>
                             </div>
                         </form>

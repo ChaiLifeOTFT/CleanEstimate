@@ -6,6 +6,66 @@
     <title>Job Complete - Drake's Precision Cleaning App</title>
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Mobile Optimizations -->
+    <style>
+        @media (max-width: 768px) {
+            /* Large buttons for field use */
+            .btn {
+                min-height: 60px !important;
+                font-size: 1.2rem !important;
+                padding: 15px 20px !important;
+                margin-bottom: 10px;
+            }
+            
+            /* Stack stats on mobile */
+            .col-md-3 {
+                margin-bottom: 1rem;
+            }
+            
+            /* Photo gallery optimization */
+            .task-photos img {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+            
+            /* Better readability */
+            .h2, h2 {
+                font-size: 1.8rem !important;
+            }
+            
+            .card-title {
+                font-size: 1.3rem !important;
+            }
+            
+            /* Exception cards more visible */
+            .alert-warning {
+                border: 2px solid #ffc107;
+                font-size: 1.1rem;
+            }
+        }
+        
+        /* High contrast stats */
+        .display-5 {
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        /* Photo comparison styles */
+        .photo-comparison {
+            position: relative;
+            overflow: hidden;
+            touch-action: pan-y;
+        }
+        
+        .photo-slider {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 50%;
+            overflow: hidden;
+        }
+    </style>
 </head>
 <body>
     <div class="container mt-4">
@@ -324,13 +384,15 @@
         <!-- Action Buttons -->
         <div class="row mb-4">
             <div class="col-12 text-center">
-                <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg me-2">
+                <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg btn-block mb-2">
                     <i class="fas fa-plus me-2"></i>
-                    Start New Job
+                    <span class="d-none d-sm-inline">Start New Job</span>
+                    <span class="d-sm-none">New Job</span>
                 </a>
-                <button onclick="window.print()" class="btn btn-outline-primary btn-lg">
+                <button onclick="window.print()" class="btn btn-outline-primary btn-lg btn-block">
                     <i class="fas fa-print me-2"></i>
-                    Print Job Report
+                    <span class="d-none d-sm-inline">Print Job Report</span>
+                    <span class="d-sm-none">Print</span>
                 </button>
             </div>
         </div>

@@ -6,6 +6,88 @@
     <title>Task {{ progress.current }} of {{ progress.total }} - Drake's Precision Cleaning App</title>
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Mobile Optimizations for Field Use -->
+    <style>
+        /* Touch-friendly buttons for construction sites */
+        .btn {
+            min-height: 55px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            padding: 12px 20px;
+            margin-bottom: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .btn {
+                min-height: 65px !important;
+                font-size: 1.25rem !important;
+                padding: 18px 24px !important;
+            }
+            
+            /* Huge timer display for visibility */
+            #timer-display, #timer-display-running {
+                font-size: 4rem !important;
+                font-weight: bold !important;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            }
+            
+            /* Large file inputs for camera */
+            input[type="file"] {
+                height: 60px !important;
+                font-size: 1.1rem !important;
+                padding: 12px !important;
+            }
+            
+            /* Better visibility outdoors */
+            .card {
+                border: 2px solid var(--bs-primary);
+                box-shadow: 0 0 15px rgba(0,0,0,0.8);
+            }
+            
+            .alert {
+                font-size: 1.1rem !important;
+                padding: 15px !important;
+                border-width: 2px !important;
+            }
+            
+            /* Stack all columns on mobile */
+            .col-md-6 {
+                width: 100%;
+                margin-bottom: 1rem;
+            }
+        }
+        
+        /* High contrast timer colors */
+        .text-danger {
+            color: #ff3333 !important;
+            font-weight: bold;
+        }
+        
+        /* Photo preview optimization */
+        .img-fluid {
+            border: 3px solid var(--bs-success);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        /* Swipe hint animation */
+        @keyframes swipeHint {
+            0% { transform: translateX(0); }
+            50% { transform: translateX(-10px); }
+            100% { transform: translateX(0); }
+        }
+        
+        .swipe-hint {
+            animation: swipeHint 2s ease-in-out infinite;
+        }
+        
+        /* Loading spinner visibility */
+        .spinner-border {
+            width: 1.5rem;
+            height: 1.5rem;
+            border-width: 0.3em;
+        }
+    </style>
 </head>
 <body>
     <div class="container mt-4">
@@ -131,7 +213,14 @@
                                     <i class="fas fa-camera me-1"></i>
                                     Take Before Photo (Required to Start)
                                 </label>
-                                <input type="file" class="form-control" id="task_before_photo" accept="image/*" required>
+                                <div class="d-grid">
+                                    <label for="task_before_photo" class="btn btn-outline-info btn-lg">
+                                        <i class="fas fa-camera-retro me-2"></i>
+                                        <span class="d-none d-sm-inline">Open Camera</span>
+                                        <span class="d-sm-none">Camera</span>
+                                    </label>
+                                </div>
+                                <input type="file" class="form-control d-none" id="task_before_photo" accept="image/*" capture="environment" required>
                                 <div class="form-text">Document the area before starting the task</div>
                                 
                                 <!-- Preview area -->
@@ -141,9 +230,10 @@
                             </div>
                             
                             <div class="d-grid gap-2">
-                                <button type="button" id="start-task-btn" class="btn btn-primary btn-lg" disabled>
-                                    <i class="fas fa-play me-2"></i>
-                                    Upload Before Photo & Start Task
+                                <button type="button" id="start-task-btn" class="btn btn-primary btn-lg btn-block" disabled>
+                                    <i class="fas fa-camera me-2"></i>
+                                    <span class="d-none d-sm-inline">Upload Before Photo & Start Task</span>
+                                    <span class="d-sm-none">Take Photo & Start</span>
                                 </button>
                             </div>
                         </div>
@@ -166,9 +256,10 @@
                                     <i class="fas fa-clock me-2"></i>
                                     Request More Time
                                 </button>
-                                <button type="button" id="stop-task-btn" class="btn btn-success btn-lg">
-                                    <i class="fas fa-stop me-2"></i>
-                                    Task Complete - Take After Photo
+                                <button type="button" id="stop-task-btn" class="btn btn-success btn-lg btn-block">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    <span class="d-none d-sm-inline">Task Complete - Take After Photo</span>
+                                    <span class="d-sm-none">Complete Task</span>
                                 </button>
                             </div>
                         </div>
@@ -203,7 +294,14 @@
                                     <i class="fas fa-camera me-1"></i>
                                     Take After Photo (Required)
                                 </label>
-                                <input type="file" class="form-control" id="task_after_photo" name="task_after_photo" accept="image/*" required>
+                                <div class="d-grid">
+                                    <label for="task_after_photo" class="btn btn-outline-success btn-lg">
+                                        <i class="fas fa-camera-retro me-2"></i>
+                                        <span class="d-none d-sm-inline">Open Camera for After Photo</span>
+                                        <span class="d-sm-none">Camera</span>
+                                    </label>
+                                </div>
+                                <input type="file" class="form-control d-none" id="task_after_photo" name="task_after_photo" accept="image/*" capture="environment" required>
                                 <div class="form-text">Document the completed task to show the results</div>
                                 
                                 <!-- Preview area -->
@@ -394,6 +492,68 @@
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Mobile Touch Navigation -->
+    <script>
+        // Swipe detection for task navigation
+        let touchStartX = 0;
+        let touchEndX = 0;
+        const swipeThreshold = 50;
+        
+        document.addEventListener('touchstart', function(e) {
+            touchStartX = e.changedTouches[0].screenX;
+        }, false);
+        
+        document.addEventListener('touchend', function(e) {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        }, false);
+        
+        function handleSwipe() {
+            const swipeDistance = touchEndX - touchStartX;
+            
+            // Swipe left to go to next task (if available)
+            if (swipeDistance < -swipeThreshold) {
+                const nextBtn = document.querySelector('a[href*="task/{{ task_index + 1 }}"]');
+                if (nextBtn) {
+                    showSwipeIndicator('Next Task →');
+                    // Optional: auto-navigate after swipe
+                    // window.location.href = nextBtn.href;
+                }
+            }
+            
+            // Swipe right to go to previous task
+            if (swipeDistance > swipeThreshold && {{ task_index }} > 0) {
+                showSwipeIndicator('← Previous Task');
+                // Optional: navigate back
+                // window.location.href = '/task/{{ task_index - 1 }}';
+            }
+        }
+        
+        function showSwipeIndicator(text) {
+            const indicator = document.createElement('div');
+            indicator.className = 'position-fixed top-50 start-50 translate-middle bg-primary text-white p-3 rounded-3';
+            indicator.style.zIndex = '9999';
+            indicator.innerHTML = `<h4>${text}</h4>`;
+            document.body.appendChild(indicator);
+            
+            setTimeout(() => {
+                indicator.remove();
+            }, 1000);
+        }
+        
+        // Vibration feedback for mobile (if supported)
+        function vibrateDevice(pattern = [50]) {
+            if ('vibrate' in navigator) {
+                navigator.vibrate(pattern);
+            }
+        }
+        
+        // Add haptic feedback to buttons
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.addEventListener('click', () => vibrateDevice());
+        });
+    </script>
     
     <!-- Photo Preview Script -->
     <script>
