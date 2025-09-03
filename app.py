@@ -23,6 +23,13 @@ logging.basicConfig(level=logging.DEBUG)
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
 
+# Session configuration for better persistence
+from datetime import timedelta
+app.permanent_session_lifetime = timedelta(hours=24)
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
 # Configuration for file uploads
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
@@ -267,6 +274,8 @@ def index():
 @app.route('/submit', methods=['POST'])
 def submit_job():
     """Handle form submission and redirect to results"""
+    app.logger.info("Job submission received")
+    
     try:
         # Get form data
         client_name = request.form.get('client_name', '').strip()
@@ -276,21 +285,29 @@ def submit_job():
         square_footage = request.form.get('square_footage', type=int)
         cleaning_type = request.form.get('cleaning_type', '').strip()
         
+        app.logger.info(f"Form data - Client: {client_name}, Address: {job_address}, Cleaner: {cleaner_name}, Sq Ft: {square_footage}, Type: {cleaning_type}")
+        
         # Validate required fields
         if not all([client_name, job_address, cleaner_name, square_footage, cleaning_type]):
+            app.logger.error("Validation failed: Missing required fields")
             flash('All fields are required.', 'error')
             return redirect(url_for('index'))
         
         if square_footage is None or square_footage <= 0:
+            app.logger.error(f"Validation failed: Invalid square footage: {square_footage}")
             flash('Square footage must be greater than 0.', 'error')
             return redirect(url_for('index'))
         
         # Calculate task times
+        app.logger.info(f"Calculating tasks for {cleaning_type} - {square_footage} sq ft")
         calculated_tasks = calculate_task_times(cleaning_type, square_footage)
         total_estimated_minutes = sum(task['estimated_minutes'] for task in calculated_tasks)
         total_estimated_hours = round(total_estimated_minutes / 60, 2)
         
+        app.logger.info(f"Calculated {len(calculated_tasks)} tasks, total time: {total_estimated_minutes} minutes")
+        
         # Store job data in session for individual task workflow
+        session.permanent = True
         session['job_data'] = {
             'client_name': client_name,
             'job_address': job_address,
@@ -306,12 +323,18 @@ def submit_job():
             'exceptions': [],  # Store exceptions and issues
             'task_timers': {}  # Store timer data for each task
         }
+        session.modified = True
+        
+        app.logger.info(f"Session created successfully for job: {client_name} - {cleaning_type} - {square_footage} sq ft")
         
         # Redirect to first task
-        return redirect(url_for('task_page', task_index=0))
+        redirect_url = url_for('task_page', task_index=0)
+        app.logger.info(f"Redirecting to: {redirect_url}")
+        return redirect(redirect_url)
         
     except Exception as e:
         app.logger.error(f"Error processing job submission: {str(e)}")
+        app.logger.exception("Full exception details:")
         flash('An error occurred while processing your submission. Please try again.', 'error')
         return redirect(url_for('index'))
 
@@ -319,10 +342,13 @@ def submit_job():
 def task_page(task_index):
     """Individual task page with before/after photo uploads"""
     if 'job_data' not in session:
+        app.logger.error(f"Task page {task_index}: No job data in session")
         flash('No active job found. Please start a new job.', 'error')
         return redirect(url_for('index'))
     
     job_data = session['job_data']
+    app.logger.info(f"Task page {task_index}: Found job data for {job_data.get('client_name', 'Unknown')}")
+    
     tasks = job_data['tasks']
     
     if task_index >= len(tasks):
@@ -338,6 +364,7 @@ def task_page(task_index):
     
     # Get timer data for this task if it exists
     timer_data = job_data.get('task_timers', {}).get(str(task_index), None)
+    app.logger.info(f"Task page {task_index}: Timer data exists: {timer_data is not None}")
     
     return render_template('task.html', 
                          task=current_task, 
@@ -443,47 +470,58 @@ def complete_task(task_index):
 def start_task(task_index):
     """Start timer for a specific task"""
     if 'job_data' not in session:
+        app.logger.error(f"Start task {task_index}: No job data in session")
         return jsonify({'error': 'No active job found'}), 400
     
     try:
         from datetime import datetime
         job_data = session['job_data']
+        app.logger.info(f"Start task {task_index}: Found job data for {job_data.get('client_name', 'Unknown')}")
         
         # Initialize task_timers if not exists
         if 'task_timers' not in job_data:
             job_data['task_timers'] = {}
         
         # Start timer for this task
+        start_time = datetime.now().isoformat()
         job_data['task_timers'][str(task_index)] = {
-            'start_time': datetime.now().isoformat(),
+            'start_time': start_time,
             'status': 'running',
             'time_extensions': [],
             'actual_minutes': 0
         }
         
         session['job_data'] = job_data
-        return jsonify({'success': True, 'start_time': job_data['task_timers'][str(task_index)]['start_time']}), 200
+        session.modified = True
+        
+        app.logger.info(f"Start task {task_index}: Timer started successfully at {start_time}")
+        return jsonify({'success': True, 'start_time': start_time}), 200
     except Exception as e:
-        app.logger.error(f"Error starting task timer: {str(e)}")
+        app.logger.error(f"Error starting task timer {task_index}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/request_more_time/<int:task_index>', methods=['POST'])
 def request_more_time(task_index):
     """Request more time for a task"""
     if 'job_data' not in session:
+        app.logger.error(f"Request extension task {task_index}: No job data in session")
         return jsonify({'error': 'No active job found'}), 400
     
     try:
         from datetime import datetime
         job_data = session['job_data']
+        app.logger.info(f"Request extension task {task_index}: Found job data for {job_data.get('client_name', 'Unknown')}")
         
         # Safely get JSON data
         json_data = request.get_json()
         if json_data is None:
+            app.logger.error(f"Request extension task {task_index}: Invalid JSON data")
             return jsonify({'error': 'Invalid JSON data'}), 400
             
         reason = json_data.get('reason', 'Additional time needed')
         additional_minutes = json_data.get('additional_minutes', 5)
+        
+        app.logger.info(f"Request extension task {task_index}: Available timers: {list(job_data.get('task_timers', {}).keys())}")
         
         if str(task_index) in job_data.get('task_timers', {}):
             extension = {
@@ -493,12 +531,16 @@ def request_more_time(task_index):
             }
             job_data['task_timers'][str(task_index)]['time_extensions'].append(extension)
             session['job_data'] = job_data
+            session.modified = True
+            
+            app.logger.info(f"Request extension task {task_index}: Extension granted: +{additional_minutes} min")
             return jsonify({'success': True, 'extension': extension}), 200
         else:
+            app.logger.error(f"Request extension task {task_index}: Timer not found")
             return jsonify({'error': 'Task timer not started'}), 400
             
     except Exception as e:
-        app.logger.error(f"Error requesting more time: {str(e)}")
+        app.logger.error(f"Error requesting more time for task {task_index}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/stop_task/<int:task_index>', methods=['POST'])
@@ -541,6 +583,8 @@ def stop_task(task_index):
         timer_data['status'] = 'completed'
         
         session['job_data'] = job_data
+        session.modified = True
+        
         app.logger.info(f"Successfully stopped timer for task {task_index}, actual minutes: {timer_data['actual_minutes']}")
         return jsonify({'success': True, 'actual_minutes': timer_data['actual_minutes']}), 200
             
