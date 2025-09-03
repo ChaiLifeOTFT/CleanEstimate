@@ -1159,18 +1159,26 @@
                     // Store the before photo filename
                     document.getElementById('before_photo_filename').value = data.filename;
                     
-                    // Now start the timer
-                    startTime = Date.now();
-                    isRunning = true;
+                    // Now start the backend timer
+                    const timerResponse = await fetch(`/start_task/${taskIndex}`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'}
+                    });
                     
-                    // Update UI - hide the entire start section
-                    document.getElementById('start-task-section').style.display = 'none';
-                    document.getElementById('timer-running-btns').style.display = 'block';
-                    
-                    // Move timer display to running section (already visible there)
-                    
-                    // Start interval timer
-                    timerInterval = setInterval(updateTimer, 1000);
+                    if (timerResponse.ok) {
+                        // Start the frontend timer
+                        startTime = Date.now();
+                        isRunning = true;
+                        
+                        // Update UI - hide the entire start section
+                        document.getElementById('start-task-section').style.display = 'none';
+                        document.getElementById('timer-running-btns').style.display = 'block';
+                        
+                        // Start interval timer
+                        timerInterval = setInterval(updateTimer, 1000);
+                    } else {
+                        throw new Error('Failed to start timer');
+                    }
                 } else {
                     alert('Failed to upload before photo. Please try again.');
                     this.disabled = false;
@@ -1228,8 +1236,24 @@
 
         // Request time extension
         document.getElementById('submit-extension').addEventListener('click', async function() {
-            const reason = document.getElementById('extension-reason').value;
+            const reason = document.getElementById('extension-reason').value.trim();
             const additionalMinutes = parseInt(document.getElementById('extension-minutes').value);
+            
+            // Validate form
+            if (!reason) {
+                alert('Please provide a reason for the extension.');
+                return;
+            }
+            
+            if (!additionalMinutes || additionalMinutes <= 0) {
+                alert('Please enter a valid number of minutes.');
+                return;
+            }
+            
+            // Disable button during request
+            this.disabled = true;
+            const originalText = this.textContent;
+            this.textContent = 'Requesting...';
             
             try {
                 const response = await fetch(`/request_more_time/${taskIndex}`, {
@@ -1255,15 +1279,27 @@
                     const modal = bootstrap.Modal.getInstance(document.getElementById('timeExtensionModal'));
                     modal.hide();
                     
+                    // Reset form
+                    document.getElementById('extension-reason').value = '';
+                    document.getElementById('extension-minutes').value = '5';
+                    
                     // Reset overtime alert
                     overtimeAlertShown = false;
-                    document.getElementById('overtime-alert').style.display = 'none';
+                    const overtimeAlert = document.getElementById('overtime-alert');
+                    const overtimeAlertRunning = document.getElementById('overtime-alert-running');
+                    if (overtimeAlert) overtimeAlert.style.display = 'none';
+                    if (overtimeAlertRunning) overtimeAlertRunning.style.display = 'none';
                 } else {
-                    alert('Failed to request extension. Please try again.');
+                    const errorData = await response.json();
+                    alert(`Failed to request extension: ${errorData.error || 'Please try again.'}`);
                 }
             } catch (error) {
                 console.error('Error requesting extension:', error);
-                alert('An error occurred while requesting more time.');
+                alert('An error occurred while requesting more time. Please check your connection and try again.');
+            } finally {
+                // Re-enable button
+                this.disabled = false;
+                this.textContent = originalText;
             }
         });
 
@@ -1272,7 +1308,7 @@
         window.addEventListener('load', function() {
             startTime = new Date('{{ timer_data.start_time }}').getTime();
             isRunning = true;
-            document.getElementById('start-task-btn').style.display = 'none';
+            document.getElementById('start-task-section').style.display = 'none';
             document.getElementById('timer-running-btns').style.display = 'block';
             timerInterval = setInterval(updateTimer, 1000);
             

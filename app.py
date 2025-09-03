@@ -443,7 +443,7 @@ def complete_task(task_index):
 def start_task(task_index):
     """Start timer for a specific task"""
     if 'job_data' not in session:
-        return {'error': 'No active job found'}, 400
+        return jsonify({'error': 'No active job found'}), 400
     
     try:
         from datetime import datetime
@@ -462,22 +462,28 @@ def start_task(task_index):
         }
         
         session['job_data'] = job_data
-        return {'success': True, 'start_time': job_data['task_timers'][str(task_index)]['start_time']}, 200
+        return jsonify({'success': True, 'start_time': job_data['task_timers'][str(task_index)]['start_time']}), 200
     except Exception as e:
         app.logger.error(f"Error starting task timer: {str(e)}")
-        return {'error': str(e)}, 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/request_more_time/<int:task_index>', methods=['POST'])
 def request_more_time(task_index):
     """Request more time for a task"""
     if 'job_data' not in session:
-        return {'error': 'No active job found'}, 400
+        return jsonify({'error': 'No active job found'}), 400
     
     try:
         from datetime import datetime
         job_data = session['job_data']
-        reason = request.json.get('reason', 'Additional time needed')
-        additional_minutes = request.json.get('additional_minutes', 5)
+        
+        # Safely get JSON data
+        json_data = request.get_json()
+        if json_data is None:
+            return jsonify({'error': 'Invalid JSON data'}), 400
+            
+        reason = json_data.get('reason', 'Additional time needed')
+        additional_minutes = json_data.get('additional_minutes', 5)
         
         if str(task_index) in job_data.get('task_timers', {}):
             extension = {
@@ -487,19 +493,19 @@ def request_more_time(task_index):
             }
             job_data['task_timers'][str(task_index)]['time_extensions'].append(extension)
             session['job_data'] = job_data
-            return {'success': True, 'extension': extension}, 200
+            return jsonify({'success': True, 'extension': extension}), 200
         else:
-            return {'error': 'Task timer not started'}, 400
+            return jsonify({'error': 'Task timer not started'}), 400
             
     except Exception as e:
         app.logger.error(f"Error requesting more time: {str(e)}")
-        return {'error': str(e)}, 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/stop_task/<int:task_index>', methods=['POST'])
 def stop_task(task_index):
     """Stop timer for a specific task"""
     if 'job_data' not in session:
-        return {'error': 'No active job found'}, 400
+        return jsonify({'error': 'No active job found'}), 400
     
     try:
         from datetime import datetime
@@ -518,13 +524,13 @@ def stop_task(task_index):
                 timer_data['status'] = 'completed'
                 
                 session['job_data'] = job_data
-                return {'success': True, 'actual_minutes': timer_data['actual_minutes']}, 200
+                return jsonify({'success': True, 'actual_minutes': timer_data['actual_minutes']}), 200
         
-        return {'error': 'Task timer not found'}, 400
+        return jsonify({'error': 'Task timer not found'}), 400
             
     except Exception as e:
         app.logger.error(f"Error stopping task timer: {str(e)}")
-        return {'error': str(e)}, 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/add_exception/<int:task_index>', methods=['POST'])
 def add_exception(task_index):
