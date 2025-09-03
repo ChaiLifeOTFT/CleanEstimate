@@ -505,32 +505,48 @@ def request_more_time(task_index):
 def stop_task(task_index):
     """Stop timer for a specific task"""
     if 'job_data' not in session:
+        app.logger.error(f"Stop task failed: No job data in session")
         return jsonify({'error': 'No active job found'}), 400
     
     try:
         from datetime import datetime
         job_data = session['job_data']
         
-        if str(task_index) in job_data.get('task_timers', {}):
-            timer_data = job_data['task_timers'][str(task_index)]
-            if timer_data['status'] == 'running':
-                # Calculate actual time taken
-                start_time = datetime.fromisoformat(timer_data['start_time'])
-                end_time = datetime.now()
-                actual_minutes = (end_time - start_time).total_seconds() / 60
-                
-                timer_data['end_time'] = end_time.isoformat()
-                timer_data['actual_minutes'] = round(actual_minutes, 1)
-                timer_data['status'] = 'completed'
-                
-                session['job_data'] = job_data
-                return jsonify({'success': True, 'actual_minutes': timer_data['actual_minutes']}), 200
+        app.logger.info(f"Attempting to stop task {task_index}")
+        app.logger.info(f"Available task_timers: {list(job_data.get('task_timers', {}).keys())}")
         
-        return jsonify({'error': 'Task timer not found'}), 400
+        task_key = str(task_index)
+        if 'task_timers' not in job_data:
+            app.logger.error(f"No task_timers found in job_data")
+            return jsonify({'error': 'No task timers found'}), 400
+            
+        if task_key not in job_data['task_timers']:
+            app.logger.error(f"Task {task_index} timer not found")
+            return jsonify({'error': f'Timer for task {task_index} not found'}), 400
+            
+        timer_data = job_data['task_timers'][task_key]
+        app.logger.info(f"Timer data for task {task_index}: {timer_data}")
+        
+        if timer_data.get('status') != 'running':
+            app.logger.error(f"Timer status is {timer_data.get('status')}, expected 'running'")
+            return jsonify({'error': f'Timer is not running (status: {timer_data.get("status", "unknown")})'}), 400
+        
+        # Calculate actual time taken
+        start_time = datetime.fromisoformat(timer_data['start_time'])
+        end_time = datetime.now()
+        actual_minutes = (end_time - start_time).total_seconds() / 60
+        
+        timer_data['end_time'] = end_time.isoformat()
+        timer_data['actual_minutes'] = round(actual_minutes, 1)
+        timer_data['status'] = 'completed'
+        
+        session['job_data'] = job_data
+        app.logger.info(f"Successfully stopped timer for task {task_index}, actual minutes: {timer_data['actual_minutes']}")
+        return jsonify({'success': True, 'actual_minutes': timer_data['actual_minutes']}), 200
             
     except Exception as e:
-        app.logger.error(f"Error stopping task timer: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"Error stopping task timer {task_index}: {str(e)}")
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/add_exception/<int:task_index>', methods=['POST'])
 def add_exception(task_index):

@@ -1226,7 +1226,10 @@
                         `<p class="text-success mt-2">${statusText}</p>`);
                     
                 } else {
-                    alert('Failed to stop timer. Please try again.');
+                    const errorData = await response.json();
+                    const errorMessage = errorData.error || 'Failed to stop timer. Please try again.';
+                    alert(`Stop Timer Error: ${errorMessage}`);
+                    console.error('Stop timer failed:', errorData);
                 }
             } catch (error) {
                 console.error('Error stopping timer:', error);
