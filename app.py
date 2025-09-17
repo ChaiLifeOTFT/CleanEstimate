@@ -1,6 +1,10 @@
 import os
 import logging
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, login_required, current_user
+from sqlalchemy.orm import DeclarativeBase
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.utils import secure_filename
 import uuid
 import json
@@ -20,8 +24,42 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
+class Base(DeclarativeBase):
+    pass
+
+db = SQLAlchemy(model_class=Base)
+
+# Create the app
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
+app.secret_key = os.environ.get("SESSION_SECRET")
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)  # needed for url_for to generate with https
+
+# Configure the database
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_recycle": 300,
+    "pool_pre_ping": True,
+}
+
+# Initialize the database with the app
+db.init_app(app)
+
+# Configure Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.login_message = 'Please log in to access this page.'
+
+@login_manager.user_loader
+def load_user(user_id):
+    from models import User
+    return User.query.get(int(user_id))
+
+# Initialize database and create tables
+with app.app_context():
+    # Import all models here so they're registered with SQLAlchemy
+    import models
+    db.create_all()
 
 # Session configuration for better persistence
 from datetime import timedelta
@@ -1130,6 +1168,221 @@ Keep responses concise but thorough. Focus on practical, actionable advice for p
     except Exception as e:
         app.logger.error(f"AI chat error: {str(e)}")
         return jsonify({'error': 'Unable to process request'}), 500
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """User login page"""
+    if request.method == 'POST':
+        from flask_login import login_user
+        from werkzeug.security import check_password_hash
+        from models import User
+        
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        
+        if not email or not password:
+            flash('Email and password are required.', 'error')
+            return render_template('login.html')
+        
+        user = User.query.filter_by(email=email).first()
+        
+        if user and user.password_hash and check_password_hash(user.password_hash, password):
+            login_user(user, remember=True)
+            flash(f'Welcome back, {user.name}!', 'success')
+            
+            # Safe redirect - only allow relative URLs to prevent open redirect attacks
+            next_page = request.args.get('next')
+            if next_page and next_page.startswith('/') and '//' not in next_page:
+                return redirect(next_page)
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Invalid email or password.', 'error')
+    
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """User registration page"""
+    if request.method == 'POST':
+        from werkzeug.security import generate_password_hash
+        from models import User
+        
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        role = request.form.get('role', 'cleaner')
+        
+        if not all([name, email, password]):
+            flash('All fields are required.', 'error')
+            return render_template('register.html')
+        
+        if role not in ['cleaner', 'coordinator']:
+            role = 'cleaner'
+        
+        # Check if user already exists
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            flash('An account with this email already exists.', 'error')
+            return render_template('register.html')
+        
+        # Create new user
+        try:
+            new_user = User(
+                name=name,
+                email=email,
+                password_hash=generate_password_hash(password),
+                role=role
+            )
+            db.session.add(new_user)
+            db.session.commit()
+            
+            flash('Registration successful! Please log in.', 'success')
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Registration error: {str(e)}")
+            flash('Registration failed. Please try again.', 'error')
+    
+    return render_template('register.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    """User logout"""
+    from flask_login import logout_user
+    logout_user()
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('index'))
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    """User dashboard showing available jobs and team coordination"""
+    from models import Job, JobTeamMember
+    
+    # Get jobs where user is a team member
+    user_jobs = db.session.query(Job).join(JobTeamMember).filter(
+        JobTeamMember.user_id == current_user.id
+    ).all()
+    
+    # Get jobs where user is coordinator
+    coordinated_jobs = Job.query.filter_by(coordinator_id=current_user.id).all()
+    
+    return render_template('dashboard.html', 
+                         user_jobs=user_jobs, 
+                         coordinated_jobs=coordinated_jobs,
+                         user=current_user)
+
+@app.route('/create_job', methods=['GET', 'POST'])
+@login_required
+def create_job():
+    """Create a new job - only coordinators can create jobs"""
+    if current_user.role != 'coordinator':
+        flash('Only coordinators can create jobs.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        from models import Job, JobTeamMember, JobTask, Task
+        
+        # Get form data
+        client_name = request.form.get('client_name', '').strip()
+        job_address = request.form.get('job_address', '').strip()
+        lot_number = request.form.get('lot_number', '').strip()
+        square_footage = request.form.get('square_footage', type=int)
+        cleaning_type = request.form.get('cleaning_type', '').strip()
+        
+        # Validate required fields
+        if not all([client_name, job_address, square_footage, cleaning_type]):
+            flash('All required fields must be filled.', 'error')
+            return render_template('create_job.html')
+        
+        try:
+            # Create the job
+            new_job = Job(
+                client_name=client_name,
+                job_address=job_address,
+                lot_number=lot_number,
+                cleaning_type=cleaning_type,
+                square_footage=square_footage,
+                coordinator_id=current_user.id
+            )
+            db.session.add(new_job)
+            db.session.flush()  # Get the job ID
+            
+            # Add coordinator to team
+            team_member = JobTeamMember(
+                job_id=new_job.id,
+                user_id=current_user.id,
+                role='coordinator'
+            )
+            db.session.add(team_member)
+            
+            # Get tasks for this cleaning type and create job tasks
+            tasks = Task.query.filter_by(cleaning_type=cleaning_type).order_by(Task.id).all()
+            total_estimated_minutes = 0
+            
+            for i, task in enumerate(tasks):
+                # Calculate time based on square footage
+                base_minutes = (square_footage / 100) * task.time_per_100_sqft
+                estimated_minutes = base_minutes + 5  # Add 5 minute buffer
+                total_estimated_minutes += estimated_minutes
+                
+                job_task = JobTask(
+                    job_id=new_job.id,
+                    task_id=task.id,
+                    task_order=i,
+                    estimated_minutes=round(estimated_minutes, 1)
+                )
+                db.session.add(job_task)
+            
+            new_job.total_estimated_minutes = round(total_estimated_minutes, 1)
+            
+            db.session.commit()
+            flash(f'Job created successfully! {len(tasks)} tasks added.', 'success')
+            return redirect(url_for('job_detail', job_id=new_job.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Job creation error: {str(e)}")
+            flash('Failed to create job. Please try again.', 'error')
+    
+    return render_template('create_job.html')
+
+@app.route('/populate_tasks')
+def populate_tasks():
+    """Populate the database with tasks from the task library - development helper"""
+    from models import Task
+    
+    try:
+        # Clear existing tasks
+        Task.query.delete()
+        
+        # Populate tasks from task_library
+        for cleaning_type, tasks in task_library.items():
+            for task_data in tasks:
+                task = Task(
+                    name=task_data['task'],
+                    instructions=task_data['instructions'],
+                    method=task_data['method'],
+                    materials=task_data['materials'],
+                    approved_products=task_data['approved_products'],
+                    precautions=task_data['precautions'],
+                    time_per_100_sqft=task_data['time_per_100'],
+                    cleaning_type=cleaning_type
+                )
+                db.session.add(task)
+        
+        db.session.commit()
+        task_count = Task.query.count()
+        flash(f'Successfully populated {task_count} tasks in database!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Task population error: {str(e)}")
+        flash('Failed to populate tasks.', 'error')
+    
+    return redirect(url_for('dashboard') if current_user.is_authenticated else url_for('index'))
 
 @app.route('/submitted')
 def submitted():
