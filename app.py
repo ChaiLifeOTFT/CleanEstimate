@@ -1368,6 +1368,100 @@ def create_job():
     
     return render_template('create_job.html')
 
+
+@app.route('/claim_task/<int:job_task_id>', methods=['POST'])
+@login_required
+def claim_task(job_task_id):
+    """Allow cleaners to claim available tasks"""
+    if current_user.role != 'cleaner':
+        flash('Only cleaners can claim tasks.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    from models import JobTask, JobTeamMember
+    
+    # Find the task
+    job_task = JobTask.query.get_or_404(job_task_id)
+    
+    # Check if user is on the job team
+    team_member = JobTeamMember.query.filter_by(
+        job_id=job_task.job_id, 
+        user_id=current_user.id
+    ).first()
+    
+    if not team_member:
+        flash('You must be assigned to the job team to claim tasks.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Attempt to claim the task
+    success, message = job_task.claim_by_user(current_user.id)
+    
+    if success:
+        flash(f'Task claimed successfully! {message}', 'success')
+    else:
+        flash(f'Failed to claim task: {message}', 'error')
+    
+    return redirect(url_for('job_tasks', job_id=job_task.job_id))
+
+
+@app.route('/release_task/<int:job_task_id>', methods=['POST'])
+@login_required
+def release_task(job_task_id):
+    """Allow users to release their claimed tasks"""
+    from models import JobTask
+    
+    job_task = JobTask.query.get_or_404(job_task_id)
+    
+    # Only allow releasing your own tasks
+    if job_task.assigned_to_id != current_user.id:
+        flash('You can only release tasks assigned to you.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Attempt to release the task
+    success, message = job_task.release_by_user(current_user.id)
+    
+    if success:
+        flash(f'Task released successfully! {message}', 'success')
+    else:
+        flash(f'Failed to release task: {message}', 'error')
+    
+    return redirect(url_for('job_tasks', job_id=job_task.job_id))
+
+
+@app.route('/job/<int:job_id>/tasks')
+@login_required
+def job_tasks(job_id):
+    """Display all tasks for a job with claiming interface"""
+    from models import Job, JobTask, JobTeamMember, User
+    
+    job = Job.query.get_or_404(job_id)
+    
+    # Check if user is coordinator or team member
+    is_coordinator = (current_user.role == 'coordinator' and job.coordinator_id == current_user.id)
+    is_team_member = JobTeamMember.query.filter_by(
+        job_id=job_id, 
+        user_id=current_user.id
+    ).first() is not None
+    
+    if not (is_coordinator or is_team_member):
+        flash('Access denied. You must be assigned to this job.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get all job tasks with their details
+    job_tasks = JobTask.query.filter_by(job_id=job_id).order_by(JobTask.task_order).all()
+    
+    # Get team members for coordinator view
+    team_members = []
+    if is_coordinator:
+        team_members = JobTeamMember.query.filter_by(job_id=job_id).join(User).all()
+    
+    return render_template('job_tasks.html', 
+                         job=job, 
+                         job_tasks=job_tasks,
+                         team_members=team_members,
+                         is_coordinator=is_coordinator,
+                         is_team_member=is_team_member)
+
+
 @app.route('/populate_tasks')
 def populate_tasks():
     """Populate the database with tasks from the task library - development helper"""

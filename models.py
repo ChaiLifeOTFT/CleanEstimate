@@ -153,23 +153,82 @@ class JobTask(db.Model):
                 (self.assigned_to_id is None or self.assigned_to_id == user_id))
 
     def claim_by_user(self, user_id):
-        """Attempt to claim this task for a user"""
+        """Attempt to claim this task for a user with robust conflict prevention"""
         if not self.can_be_claimed_by(user_id):
-            return False
+            return False, "Task cannot be claimed"
             
         try:
-            # Simple claim without complex locking for now
-            self.status = 'claimed'
-            self.assigned_to_id = user_id
-            self.claimed_at = datetime.now(timezone.utc)
-            self.lock_version += 1
+            # Use pessimistic locking to prevent race conditions
+            from sqlalchemy import and_
+            locked_task = db.session.query(JobTask).filter(
+                and_(
+                    JobTask.id == self.id,
+                    JobTask.lock_version == self.lock_version,
+                    JobTask.status == 'pending'
+                )
+            ).with_for_update().first()
+            
+            if not locked_task:
+                return False, "Task was already claimed by another user"
+            
+            # Update task atomically
+            locked_task.status = 'claimed'
+            locked_task.assigned_to_id = user_id
+            locked_task.claimed_at = datetime.now(timezone.utc)
+            locked_task.lock_version += 1
+            
+            # Log the claiming activity
+            from models import ActivityLog
+            activity = ActivityLog(
+                job_id=locked_task.job_id,
+                user_id=user_id,
+                event_type='task_claimed',
+                payload={
+                    'task_id': locked_task.task_id,
+                    'job_task_id': locked_task.id,
+                    'task_order': locked_task.task_order
+                }
+            )
+            db.session.add(activity)
             
             db.session.commit()
-            return True
+            return True, "Task claimed successfully"
             
         except Exception as e:
             db.session.rollback()
-            return False
+            return False, f"Failed to claim task: {str(e)}"
+
+    def release_by_user(self, user_id):
+        """Release a claimed task back to pending status"""
+        if self.assigned_to_id != user_id or self.status not in ['claimed', 'blocked']:
+            return False, "Task cannot be released by this user"
+            
+        try:
+            self.status = 'pending'
+            self.assigned_to_id = None
+            self.claimed_at = None
+            self.lock_version += 1
+            
+            # Log the release activity
+            from models import ActivityLog
+            activity = ActivityLog(
+                job_id=self.job_id,
+                user_id=user_id,
+                event_type='task_released',
+                payload={
+                    'task_id': self.task_id,
+                    'job_task_id': self.id,
+                    'task_order': self.task_order
+                }
+            )
+            db.session.add(activity)
+            
+            db.session.commit()
+            return True, "Task released successfully"
+            
+        except Exception as e:
+            db.session.rollback()
+            return False, f"Failed to release task: {str(e)}"
 
     def __repr__(self):
         return f'<JobTask {self.job_id}-{self.task_order} ({self.status})>'

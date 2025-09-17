@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ job.client_name }} - Job Tasks | Drake's Precision Cleaning</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://replit-cdn.replit.com/agent/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .main-container {
+            padding: 2rem 0;
+        }
+        
+        .job-header {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        .task-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border-left: 5px solid #28a745;
+        }
+        
+        .task-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .task-card.claimed {
+            border-left-color: #ffc107;
+        }
+        
+        .task-card.in-progress {
+            border-left-color: #007bff;
+        }
+        
+        .task-card.completed {
+            border-left-color: #28a745;
+            opacity: 0.8;
+        }
+        
+        .task-card.blocked {
+            border-left-color: #dc3545;
+        }
+        
+        .status-badge {
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-pending { background-color: #6c757d; }
+        .status-claimed { background-color: #ffc107; color: #000; }
+        .status-in-progress { background-color: #007bff; }
+        .status-completed { background-color: #28a745; }
+        .status-blocked { background-color: #dc3545; }
+        
+        .btn-claim {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            border: none;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-claim:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        }
+        
+        .btn-release {
+            background: linear-gradient(45deg, #ffc107, #fd7e14);
+            border: none;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            color: #000;
+        }
+        
+        .team-info {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .progress-indicator {
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <!-- Job Header -->
+        <div class="job-header">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-0">
+                        <i class="fas fa-building me-2 text-primary"></i>
+                        {{ job.client_name }}
+                    </h1>
+                    <p class="text-muted mb-2">
+                        <i class="fas fa-map-marker-alt me-2"></i>{{ job.job_address }}
+                        {% if job.lot_number %}
+                        <span class="ms-3"><i class="fas fa-tag me-1"></i>Lot #{{ job.lot_number }}</span>
+                        {% endif %}
+                    </p>
+                    <div class="row mt-3">
+                        <div class="col-sm-6">
+                            <span class="badge bg-info me-2">{{ job.cleaning_type|title }}</span>
+                            <span class="text-muted">{{ "{:,.0f}".format(job.square_footage) }} sq ft</span>
+                        </div>
+                        <div class="col-sm-6">
+                            <small class="text-muted">
+                                Created {{ job.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                        {% if category == 'success' %}
+                            <i class="fas fa-check-circle me-2"></i>
+                        {% elif category == 'error' %}
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                        {% else %}
+                            <i class="fas fa-info-circle me-2"></i>
+                        {% endif %}
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Progress Indicator -->
+        {% set completed_count = job_tasks|selectattr("status", "equalto", "completed")|list|length %}
+        {% set total_count = job_tasks|length %}
+        <div class="job-header">
+            <h5><i class="fas fa-chart-line me-2"></i>Job Progress</h5>
+            <div class="progress-indicator">
+                <div class="progress">
+                    <div class="progress-bar bg-success" role="progressbar" 
+                         style="width: {{ (completed_count / total_count * 100) if total_count > 0 else 0 }}%">
+                        {{ completed_count }}/{{ total_count }} Complete
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Team Info (Coordinator View) -->
+        {% if is_coordinator and team_members %}
+        <div class="team-info">
+            <h5><i class="fas fa-users me-2"></i>Team Members</h5>
+            <div class="row">
+                {% for member in team_members %}
+                <div class="col-md-6 mb-2">
+                    <span class="badge bg-primary me-2">
+                        <i class="fas fa-user me-1"></i>{{ member.user.name }}
+                    </span>
+                    <small class="text-muted">{{ member.user.role|title }}</small>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Task List -->
+        <div class="row">
+            {% for job_task in job_tasks %}
+            <div class="col-12 mb-3">
+                <div class="task-card {{ job_task.status }}">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <!-- Task Info -->
+                            <div class="col-md-6">
+                                <h5 class="card-title mb-2">
+                                    <span class="badge bg-secondary me-2">#{{ job_task.task_order }}</span>
+                                    {{ job_task.task.name }}
+                                </h5>
+                                <p class="text-muted mb-2">
+                                    <i class="fas fa-clock me-2"></i>
+                                    Estimated: {{ job_task.estimated_minutes|round(1) }} minutes
+                                </p>
+                                <p class="card-text text-truncate">
+                                    {{ job_task.task.instructions[:100] }}...
+                                </p>
+                            </div>
+
+                            <!-- Status & Assignment -->
+                            <div class="col-md-3">
+                                <span class="badge status-badge status-{{ job_task.status }} mb-2">
+                                    {{ job_task.status|replace('_', ' ') }}
+                                </span>
+                                {% if job_task.assigned_to %}
+                                <div class="text-muted small">
+                                    <i class="fas fa-user me-1"></i>
+                                    {{ job_task.assigned_to.name }}
+                                </div>
+                                {% endif %}
+                                {% if job_task.claimed_at %}
+                                <div class="text-muted small">
+                                    <i class="fas fa-calendar me-1"></i>
+                                    Claimed {{ job_task.claimed_at.strftime('%m/%d %I:%M%p') }}
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="col-md-3 text-end">
+                                {% if current_user.role == 'cleaner' %}
+                                    <!-- Cleaner can claim available tasks -->
+                                    {% if job_task.status == 'pending' and not job_task.assigned_to_id %}
+                                    <form method="POST" action="{{ url_for('claim_task', job_task_id=job_task.id) }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <button type="submit" class="btn btn-claim text-white">
+                                            <i class="fas fa-hand-paper me-2"></i>Claim Task
+                                        </button>
+                                    </form>
+                                    {% elif job_task.assigned_to_id == current_user.id and job_task.status in ['claimed', 'blocked'] %}
+                                    <div class="btn-group" role="group">
+                                        <form method="POST" action="{{ url_for('release_task', job_task_id=job_task.id) }}" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                            <button type="submit" class="btn btn-release">
+                                                <i class="fas fa-undo me-2"></i>Release
+                                            </button>
+                                        </form>
+                                        {% if job_task.status == 'claimed' %}
+                                        <a href="{{ url_for('task_page', task_index=(job_task.task_order - 1)) }}" class="btn btn-primary">
+                                            <i class="fas fa-play me-2"></i>Start Work
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                    {% elif job_task.assigned_to_id == current_user.id and job_task.status == 'in_progress' %}
+                                    <a href="{{ url_for('task_page', task_index=(job_task.task_order - 1)) }}" class="btn btn-info">
+                                        <i class="fas fa-arrow-right me-2"></i>Continue
+                                    </a>
+                                    {% elif job_task.status == 'completed' %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-2"></i>Completed
+                                    </span>
+                                    {% else %}
+                                    <span class="text-muted">
+                                        <i class="fas fa-lock me-2"></i>Not Available
+                                    </span>
+                                    {% endif %}
+                                {% else %}
+                                    <!-- Coordinator view -->
+                                    {% if job_task.status == 'completed' %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-2"></i>Completed
+                                    </span>
+                                    {% else %}
+                                    <a href="{{ url_for('task_page', task_index=(job_task.task_order - 1)) }}" class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-eye me-2"></i>View Details
+                                    </a>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if not job_tasks %}
+        <div class="text-center py-5">
+            <div class="job-header">
+                <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
+                <h3>No Tasks Available</h3>
+                <p class="text-muted">Tasks will appear here once they are assigned to this job.</p>
+                {% if is_coordinator %}
+                <a href="{{ url_for('create_job') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Create Job with Tasks
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://replit-cdn.replit.com/agent/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Auto-refresh for real-time updates -->
+    <script>
+        // Auto-refresh every 30 seconds for real-time coordination
+        setTimeout(function() {
+            window.location.reload();
+        }, 30000);
+    </script>
+</body>
+</html>
