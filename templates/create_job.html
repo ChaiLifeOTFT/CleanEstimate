@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Job - Drake's Precision Cleaning</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #1a1a1a; color: #e0e0e0; }
+        .card { background-color: #2d2d2d; border: 1px solid #404040; }
+        .form-control, .form-select { background-color: #404040; border: 1px solid #555; color: #e0e0e0; }
+        .form-control:focus, .form-select:focus { background-color: #404040; border-color: #007bff; color: #e0e0e0; box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); }
+        .btn-primary { background-color: #007bff; border-color: #007bff; }
+        .btn-outline-secondary { color: #6c757d; border-color: #6c757d; }
+        .btn-outline-secondary:hover { color: #fff; background-color: #6c757d; border-color: #6c757d; }
+        .form-label { color: #d0d0d0; font-weight: 500; }
+        .form-text { color: #9a9a9a; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                <i class="fas fa-broom me-2"></i>Drake's Precision Cleaning
+            </a>
+            
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-body p-4">
+                        <div class="text-center mb-4">
+                            <i class="fas fa-plus-circle fa-3x text-primary mb-3"></i>
+                            <h2 class="card-title">Create New Cleaning Job</h2>
+                            <p class="text-muted">Set up a new cleaning project for your team</p>
+                        </div>
+
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                        {{ message }}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+
+                        <form method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="client_name" class="form-label">
+                                        <i class="fas fa-user me-2"></i>Client Name *
+                                    </label>
+                                    <input type="text" class="form-control" id="client_name" name="client_name" required maxlength="100">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="lot_number" class="form-label">
+                                        <i class="fas fa-hashtag me-2"></i>Lot Number
+                                    </label>
+                                    <input type="text" class="form-control" id="lot_number" name="lot_number" maxlength="50" placeholder="e.g., Lot 245, 3A, B12">
+                                    <div class="form-text">Optional lot or unit identifier</div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="job_address" class="form-label">
+                                    <i class="fas fa-map-marker-alt me-2"></i>Property Address *
+                                </label>
+                                <input type="text" class="form-control" id="job_address" name="job_address" required maxlength="200" placeholder="123 Main Street, City, State 12345">
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="square_footage" class="form-label">
+                                        <i class="fas fa-home me-2"></i>Square Footage *
+                                    </label>
+                                    <input type="number" class="form-control" id="square_footage" name="square_footage" required min="1" max="50000" placeholder="2500">
+                                    <div class="form-text">Total cleanable square feet</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="cleaning_type" class="form-label">
+                                        <i class="fas fa-spray-can me-2"></i>Cleaning Type *
+                                    </label>
+                                    <select class="form-select" id="cleaning_type" name="cleaning_type" required>
+                                        <option value="">Select cleaning type...</option>
+                                        <option value="Rough Clean">Rough Clean</option>
+                                        <option value="Final Clean">Final Clean</option>
+                                        <option value="QC Clean">QC Clean</option>
+                                        <option value="Spec Clean">Spec Clean</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info d-flex align-items-center" role="alert">
+                                <i class="fas fa-info-circle me-3"></i>
+                                <div>
+                                    <strong>Note:</strong> After creating the job, you can invite team members and assign specific tasks. The system will automatically calculate task times based on the square footage and cleaning type selected.
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between mt-4">
+                                <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times me-2"></i>Cancel
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-check me-2"></i>Create Job
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

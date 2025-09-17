@@ -40,6 +40,7 @@
                         {% endwith %}
 
                         <form method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <div class="mb-3">
                                 <label for="name" class="form-label">
                                     <i class="fas fa-user me-2"></i>Full Name
@@ -62,15 +63,7 @@
                                 <div class="form-text text-muted">Minimum 6 characters</div>
                             </div>
 
-                            <div class="mb-3">
-                                <label for="role" class="form-label">
-                                    <i class="fas fa-user-tag me-2"></i>Role
-                                </label>
-                                <select class="form-select" id="role" name="role" required>
-                                    <option value="cleaner">Cleaner</option>
-                                    <option value="coordinator">Coordinator</option>
-                                </select>
-                            </div>
+                            <!-- Role is automatically set to 'cleaner' for security - coordinators must be assigned by admin -->
 
                             <div class="d-grid">
                                 <button type="submit" class="btn btn-success">

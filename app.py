@@ -3,8 +3,10 @@ import logging
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_required, current_user
+from flask_wtf.csrf import CSRFProtect
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
+from functools import wraps
 from werkzeug.utils import secure_filename
 import uuid
 import json
@@ -50,10 +52,28 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Please log in to access this page.'
 
+# Configure CSRF Protection
+csrf = CSRFProtect(app)
+
 @login_manager.user_loader
 def load_user(user_id):
     from models import User
     return User.query.get(int(user_id))
+
+def role_required(required_role):
+    """Decorator to require specific user role"""
+    def decorator(f):
+        @wraps(f)
+        @login_required
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return redirect(url_for('login'))
+            if current_user.role != required_role:
+                flash(f'Access denied. This feature requires {required_role} role.', 'error')
+                return redirect(url_for('dashboard'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 # Initialize database and create tables
 with app.app_context():
@@ -64,9 +84,12 @@ with app.app_context():
 # Session configuration for better persistence
 from datetime import timedelta
 app.permanent_session_lifetime = timedelta(hours=24)
-app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+
+# Production-ready session security settings
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'  # True for HTTPS in production
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['REMEMBER_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'  # Flask-Login remember me security
 
 # Configuration for file uploads
 UPLOAD_FOLDER = 'static/uploads'
@@ -1210,14 +1233,13 @@ def register():
         name = request.form.get('name', '').strip()
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
-        role = request.form.get('role', 'cleaner')
+        # Force all new registrations to 'cleaner' role for security
+        # Coordinators must be promoted by an admin
+        role = 'cleaner'
         
         if not all([name, email, password]):
             flash('All fields are required.', 'error')
             return render_template('register.html')
-        
-        if role not in ['cleaner', 'coordinator']:
-            role = 'cleaner'
         
         # Check if user already exists
         existing_user = User.query.filter_by(email=email).first()
@@ -1275,12 +1297,9 @@ def dashboard():
                          user=current_user)
 
 @app.route('/create_job', methods=['GET', 'POST'])
-@login_required
+@role_required('coordinator')
 def create_job():
     """Create a new job - only coordinators can create jobs"""
-    if current_user.role != 'coordinator':
-        flash('Only coordinators can create jobs.', 'error')
-        return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
         from models import Job, JobTeamMember, JobTask, Task

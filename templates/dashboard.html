@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Dashboard - Drake's Precision Cleaning</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #1a1a1a; color: #e0e0e0; }
+        .card { background-color: #2d2d2d; border: 1px solid #404040; }
+        .card-header { background-color: #383838; border-bottom: 1px solid #404040; }
+        .nav-tabs .nav-link { color: #b0b0b0; border-color: #404040; background-color: #2d2d2d; }
+        .nav-tabs .nav-link.active { color: #fff; background-color: #007bff; border-color: #007bff; }
+        .nav-tabs .nav-link:hover { background-color: #404040; color: #fff; }
+        .badge.bg-success { background-color: #28a745 !important; }
+        .badge.bg-warning { background-color: #ffc107 !important; }
+        .badge.bg-info { background-color: #17a2b8 !important; }
+        .btn-outline-primary { color: #007bff; border-color: #007bff; }
+        .btn-outline-primary:hover { color: #fff; background-color: #007bff; border-color: #007bff; }
+        .list-group-item { background-color: #383838; border-color: #404040; color: #e0e0e0; }
+        .list-group-item:hover { background-color: #454545; }
+        .text-muted { color: #9a9a9a !important; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                <i class="fas fa-broom me-2"></i>Drake's Precision Cleaning
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user me-2"></i>{{ user.name }}
+                            <span class="badge bg-{{ 'warning' if user.role == 'coordinator' else 'info' }} ms-2">
+                                {{ user.role.title() }}
+                            </span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark">
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt me-2"></i>Logout
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>
+                        <i class="fas fa-tachometer-alt me-2"></i>Team Dashboard
+                    </h2>
+                    
+                    {% if user.role == 'coordinator' %}
+                        <a href="{{ url_for('create_job') }}" class="btn btn-primary">
+                            <i class="fas fa-plus me-2"></i>Create New Job
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <ul class="nav nav-tabs mb-4" id="jobTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="team-jobs-tab" data-bs-toggle="tab" data-bs-target="#team-jobs" type="button" role="tab">
+                    <i class="fas fa-users me-2"></i>My Team Jobs
+                    <span class="badge bg-info ms-2">{{ user_jobs|length }}</span>
+                </button>
+            </li>
+            {% if user.role == 'coordinator' %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="coordinated-jobs-tab" data-bs-toggle="tab" data-bs-target="#coordinated-jobs" type="button" role="tab">
+                        <i class="fas fa-clipboard-list me-2"></i>Jobs I Coordinate
+                        <span class="badge bg-warning ms-2">{{ coordinated_jobs|length }}</span>
+                    </button>
+                </li>
+            {% endif %}
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="jobTabsContent">
+            <!-- My Team Jobs Tab -->
+            <div class="tab-pane fade show active" id="team-jobs" role="tabpanel">
+                {% if user_jobs %}
+                    <div class="row">
+                        {% for job in user_jobs %}
+                            <div class="col-lg-6 col-xl-4 mb-4">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <h6 class="card-title mb-0">{{ job.client_name }}</h6>
+                                            <span class="badge bg-{{ 'success' if job.status == 'completed' else 'warning' if job.status == 'active' else 'secondary' }}">
+                                                {{ job.status.title() }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="card-text text-muted mb-2">
+                                            <i class="fas fa-map-marker-alt me-2"></i>{{ job.job_address }}
+                                        </p>
+                                        {% if job.lot_number %}
+                                            <p class="card-text text-muted mb-2">
+                                                <i class="fas fa-hashtag me-2"></i>Lot {{ job.lot_number }}
+                                            </p>
+                                        {% endif %}
+                                        <p class="card-text text-muted mb-2">
+                                            <i class="fas fa-home me-2"></i>{{ job.square_footage|int }} sq ft
+                                        </p>
+                                        <p class="card-text text-muted mb-3">
+                                            <i class="fas fa-spray-can me-2"></i>{{ job.cleaning_type }}
+                                        </p>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <small class="text-muted">
+                                                <i class="fas fa-clock me-1"></i>{{ "%.1f"|format(job.total_estimated_minutes or 0) }} min est.
+                                            </small>
+                                            <a href="#" class="btn btn-outline-primary btn-sm">
+                                                <i class="fas fa-eye me-1"></i>View Tasks
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="card">
+                        <div class="card-body text-center py-5">
+                            <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No Team Jobs Assigned</h5>
+                            <p class="text-muted">You're not currently assigned to any cleaning jobs. Contact your coordinator to get added to a team.</p>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Coordinated Jobs Tab (Only for Coordinators) -->
+            {% if user.role == 'coordinator' %}
+                <div class="tab-pane fade" id="coordinated-jobs" role="tabpanel">
+                    {% if coordinated_jobs %}
+                        <div class="row">
+                            {% for job in coordinated_jobs %}
+                                <div class="col-lg-6 col-xl-4 mb-4">
+                                    <div class="card h-100">
+                                        <div class="card-header">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <h6 class="card-title mb-0">{{ job.client_name }}</h6>
+                                                <span class="badge bg-{{ 'success' if job.status == 'completed' else 'warning' if job.status == 'active' else 'secondary' }}">
+                                                    {{ job.status.title() }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="card-text text-muted mb-2">
+                                                <i class="fas fa-map-marker-alt me-2"></i>{{ job.job_address }}
+                                            </p>
+                                            {% if job.lot_number %}
+                                                <p class="card-text text-muted mb-2">
+                                                    <i class="fas fa-hashtag me-2"></i>Lot {{ job.lot_number }}
+                                                </p>
+                                            {% endif %}
+                                            <p class="card-text text-muted mb-2">
+                                                <i class="fas fa-home me-2"></i>{{ job.square_footage|int }} sq ft
+                                            </p>
+                                            <p class="card-text text-muted mb-2">
+                                                <i class="fas fa-spray-can me-2"></i>{{ job.cleaning_type }}
+                                            </p>
+                                            <p class="card-text text-muted mb-3">
+                                                <i class="fas fa-users me-2"></i>{{ job.team_members|length }} team members
+                                            </p>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-clock me-1"></i>{{ "%.1f"|format(job.total_estimated_minutes or 0) }} min est.
+                                                </small>
+                                                <a href="#" class="btn btn-outline-primary btn-sm">
+                                                    <i class="fas fa-cog me-1"></i>Manage
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="card">
+                            <div class="card-body text-center py-5">
+                                <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">No Jobs Coordinated</h5>
+                                <p class="text-muted">You haven't created any cleaning jobs yet. Click "Create New Job" to get started with coordinating your first cleaning project.</p>
+                                <a href="{{ url_for('create_job') }}" class="btn btn-primary">
+                                    <i class="fas fa-plus me-2"></i>Create Your First Job
+                                </a>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Quick Stats Row -->
+        <div class="row mt-5">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-chart-line fa-2x text-primary mb-3"></i>
+                        <h5>Your Role: {{ user.role.title() }}</h5>
+                        <p class="text-muted">
+                            {% if user.role == 'coordinator' %}
+                                You can create jobs, assign team members, and coordinate cleaning projects.
+                            {% else %}
+                                You can join teams, claim tasks, and complete cleaning assignments.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-tasks fa-2x text-success mb-3"></i>
+                        <h5>Active Projects</h5>
+                        <h3 class="text-success">{{ (user_jobs|length + coordinated_jobs|length) if user.role == 'coordinator' else user_jobs|length }}</h3>
+                        <p class="text-muted">Current cleaning jobs</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
