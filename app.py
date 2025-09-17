@@ -334,105 +334,106 @@ def index():
 
 @app.route('/submit', methods=['POST'])
 def submit_job():
-    """Handle form submission and redirect to results"""
-    app.logger.info("Job submission received")
+    """Handle legacy form submission and redirect to database-backed job creation"""
+    app.logger.info("Legacy job submission received - redirecting to database-backed system")
     
-    try:
-        # Get form data
-        client_name = request.form.get('client_name', '').strip()
-        job_address = request.form.get('job_address', '').strip()
-        lot_number = request.form.get('lot_number', '').strip()
-        cleaner_name = request.form.get('cleaner_name', '').strip()
-        square_footage = request.form.get('square_footage', type=int)
-        cleaning_type = request.form.get('cleaning_type', '').strip()
-        
-        app.logger.info(f"Form data - Client: {client_name}, Address: {job_address}, Cleaner: {cleaner_name}, Sq Ft: {square_footage}, Type: {cleaning_type}")
-        
-        # Validate required fields
-        if not all([client_name, job_address, cleaner_name, square_footage, cleaning_type]):
-            app.logger.error("Validation failed: Missing required fields")
-            flash('All fields are required.', 'error')
-            return redirect(url_for('index'))
-        
-        if square_footage is None or square_footage <= 0:
-            app.logger.error(f"Validation failed: Invalid square footage: {square_footage}")
-            flash('Square footage must be greater than 0.', 'error')
-            return redirect(url_for('index'))
-        
-        # Calculate task times
-        app.logger.info(f"Calculating tasks for {cleaning_type} - {square_footage} sq ft")
-        calculated_tasks = calculate_task_times(cleaning_type, square_footage)
-        total_estimated_minutes = sum(task['estimated_minutes'] for task in calculated_tasks)
-        total_estimated_hours = round(total_estimated_minutes / 60, 2)
-        
-        app.logger.info(f"Calculated {len(calculated_tasks)} tasks, total time: {total_estimated_minutes} minutes")
-        
-        # Store job data in session for individual task workflow
-        session.permanent = True
-        session['job_data'] = {
-            'client_name': client_name,
-            'job_address': job_address,
-            'lot_number': lot_number,
-            'cleaner_name': cleaner_name,
-            'square_footage': square_footage,
-            'cleaning_type': cleaning_type,
-            'tasks': calculated_tasks,
-            'total_estimated_minutes': round(total_estimated_minutes, 1),
-            'total_estimated_hours': total_estimated_hours,
-            'current_task_index': 0,
-            'completed_tasks': [],
-            'exceptions': [],  # Store exceptions and issues
-            'task_timers': {}  # Store timer data for each task
-        }
-        session.modified = True
-        
-        app.logger.info(f"Session created successfully for job: {client_name} - {cleaning_type} - {square_footage} sq ft")
-        
-        # Redirect to first task
-        redirect_url = url_for('task_page', task_index=0)
-        app.logger.info(f"Redirecting to: {redirect_url}")
-        return redirect(redirect_url)
-        
-    except Exception as e:
-        app.logger.error(f"Error processing job submission: {str(e)}")
-        app.logger.exception("Full exception details:")
-        flash('An error occurred while processing your submission. Please try again.', 'error')
-        return redirect(url_for('index'))
+    # For legacy compatibility, redirect users to create an account and use the new system
+    if not current_user.is_authenticated:
+        flash('Please create an account to use the new team-based job management system with real-time coordination.', 'info')
+        return redirect(url_for('register'))
+    
+    # If user is authenticated but not a coordinator, show message about team-based system
+    if current_user.role != 'coordinator':
+        flash('Only coordinators can create jobs in the new team-based system. Please contact your coordinator.', 'info')
+        return redirect(url_for('dashboard'))
+    
+    # If user is a coordinator, redirect them to create a job in the database system
+    flash('Please use the new job creation system for better team coordination and task management.', 'info')
+    return redirect(url_for('create_job'))
 
-@app.route('/task/<int:task_index>')
-def task_page(task_index):
-    """Individual task page with before/after photo uploads"""
-    if 'job_data' not in session:
-        app.logger.error(f"Task page {task_index}: No job data in session")
-        flash('No active job found. Please start a new job.', 'error')
-        return redirect(url_for('index'))
+@app.route('/task/<int:job_id>/<int:task_order>')
+@login_required
+def task_page(job_id, task_order):
+    """Individual task page with database-backed job data"""
+    from models import Job, JobTask, JobTeamMember, Timer
     
-    job_data = session['job_data']
-    app.logger.info(f"Task page {task_index}: Found job data for {job_data.get('client_name', 'Unknown')}")
+    # Get the job
+    job = Job.query.get_or_404(job_id)
     
-    tasks = job_data['tasks']
+    # Check if user has access to this job
+    is_coordinator = (current_user.role == 'coordinator' and job.coordinator_id == current_user.id)
+    is_team_member = JobTeamMember.query.filter_by(
+        job_id=job_id, 
+        user_id=current_user.id
+    ).first() is not None
     
-    if task_index >= len(tasks):
-        # All tasks completed, show summary
-        return redirect(url_for('job_complete'))
+    if not (is_coordinator or is_team_member):
+        flash('Access denied. You must be assigned to this job.', 'error')
+        return redirect(url_for('dashboard'))
     
-    current_task = tasks[task_index]
+    # Get the specific task by order
+    job_task = JobTask.query.filter_by(
+        job_id=job_id, 
+        task_order=task_order
+    ).first_or_404()
+    
+    # Check if task is claimed by current user or available
+    if current_user.role == 'cleaner' and job_task.status == 'pending':
+        flash('Please claim this task first before starting work.', 'info')
+        return redirect(url_for('job_tasks', job_id=job_id))
+    elif current_user.role == 'cleaner' and job_task.assigned_to_id != current_user.id:
+        flash('This task is assigned to another team member.', 'error')
+        return redirect(url_for('job_tasks', job_id=job_id))
+    
+    # Get all job tasks for progress calculation
+    total_tasks = JobTask.query.filter_by(job_id=job_id).count()
+    completed_tasks = JobTask.query.filter_by(job_id=job_id, status='completed').count()
+    
     progress = {
-        'current': task_index + 1,
-        'total': len(tasks),
-        'percentage': round(((task_index) / len(tasks)) * 100)
+        'current': task_order + 1,
+        'total': total_tasks,
+        'percentage': round((completed_tasks / total_tasks) * 100) if total_tasks > 0 else 0
     }
     
-    # Get timer data for this task if it exists
-    timer_data = job_data.get('task_timers', {}).get(str(task_index), None)
-    app.logger.info(f"Task page {task_index}: Timer data exists: {timer_data is not None}")
+    # Get timer data for this task
+    timer = Timer.query.filter_by(
+        job_task_id=job_task.id,
+        user_id=current_user.id,
+        stopped_at=None
+    ).first()
+    
+    # Convert timer to legacy format for template compatibility
+    timer_data = None
+    if timer:
+        timer_data = {
+            'start_time': timer.started_at.isoformat(),
+            'status': 'running',
+            'actual_minutes': 0
+        }
+    
+    app.logger.info(f"Task page {task_order}: Job {job_id}, User {current_user.id}, Timer active: {timer is not None}")
     
     return render_template('task.html', 
-                         task=current_task, 
-                         task_index=task_index,
-                         job_data=job_data, 
+                         task={
+                             'task': job_task.task.name,
+                             'instructions': job_task.task.instructions,
+                             'method': job_task.task.method,
+                             'materials': job_task.task.materials,
+                             'approved_products': job_task.task.approved_products,
+                             'precautions': job_task.task.precautions,
+                             'estimated_minutes': job_task.estimated_minutes
+                         },
+                         task_index=task_order,
+                         job_data={
+                             'client_name': job.client_name,
+                             'job_address': job.job_address,
+                             'cleaning_type': job.cleaning_type,
+                             'square_footage': job.square_footage
+                         },
                          progress=progress,
-                         timer_data=timer_data)
+                         timer_data=timer_data,
+                         job=job,
+                         job_task=job_task)
 
 @app.route('/upload_before_photo', methods=['POST'])
 def upload_before_photo():
@@ -527,39 +528,75 @@ def complete_task(task_index):
         flash('An error occurred while completing the task. Please try again.', 'error')
         return redirect(url_for('task_page', task_index=task_index))
 
-@app.route('/start_task/<int:task_index>', methods=['POST'])
-def start_task(task_index):
-    """Start timer for a specific task"""
-    if 'job_data' not in session:
-        app.logger.error(f"Start task {task_index}: No job data in session")
-        return jsonify({'error': 'No active job found'}), 400
+@app.route('/start_task/<int:job_id>/<int:task_order>', methods=['POST'])
+@login_required
+def start_task(job_id, task_order):
+    """Start database-backed timer for a specific task"""
+    from models import JobTask, Timer
     
     try:
-        from datetime import datetime
-        job_data = session['job_data']
-        app.logger.info(f"Start task {task_index}: Found job data for {job_data.get('client_name', 'Unknown')}")
+        # Get the job task
+        job_task = JobTask.query.filter_by(
+            job_id=job_id,
+            task_order=task_order
+        ).first_or_404()
         
-        # Initialize task_timers if not exists
-        if 'task_timers' not in job_data:
-            job_data['task_timers'] = {}
+        # Check if user has permission to start this task
+        if job_task.assigned_to_id != current_user.id:
+            return jsonify({'error': 'Task not assigned to you'}), 403
         
-        # Start timer for this task
-        start_time = datetime.now().isoformat()
-        job_data['task_timers'][str(task_index)] = {
-            'start_time': start_time,
-            'status': 'running',
-            'time_extensions': [],
-            'actual_minutes': 0
-        }
+        if job_task.status not in ['claimed', 'in_progress']:
+            return jsonify({'error': 'Task must be claimed before starting timer'}), 400
         
-        session['job_data'] = job_data
-        session.modified = True
+        # Check if timer is already running
+        existing_timer = Timer.query.filter_by(
+            job_task_id=job_task.id,
+            user_id=current_user.id,
+            stopped_at=None
+        ).first()
         
-        app.logger.info(f"Start task {task_index}: Timer started successfully at {start_time}")
-        return jsonify({'success': True, 'start_time': start_time}), 200
+        if existing_timer:
+            return jsonify({'error': 'Timer is already running for this task'}), 400
+        
+        # Create new timer
+        timer = Timer(
+            job_task_id=job_task.id,
+            user_id=current_user.id,
+            started_at=datetime.now(timezone.utc)
+        )
+        db.session.add(timer)
+        
+        # Update task status to in_progress
+        job_task.status = 'in_progress'
+        job_task.started_at = datetime.now(timezone.utc)
+        
+        # Log activity
+        from models import ActivityLog
+        activity = ActivityLog(
+            job_id=job_task.job_id,
+            user_id=current_user.id,
+            event_type='timer_started',
+            payload={
+                'task_id': job_task.task_id,
+                'job_task_id': job_task.id,
+                'task_order': job_task.task_order
+            }
+        )
+        db.session.add(activity)
+        
+        db.session.commit()
+        
+        app.logger.info(f"Timer started for task {task_order} in job {job_id} by user {current_user.id}")
+        return jsonify({
+            'success': True, 
+            'start_time': timer.started_at.isoformat(),
+            'timer_id': timer.id
+        }), 200
+        
     except Exception as e:
-        app.logger.error(f"Error starting task timer {task_index}: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        db.session.rollback()
+        app.logger.error(f"Error starting task timer {task_order}: {str(e)}")
+        return jsonify({'error': f'Failed to start timer: {str(e)}'}), 500
 
 @app.route('/request_more_time/<int:task_index>', methods=['POST'])
 def request_more_time(task_index):
@@ -604,54 +641,77 @@ def request_more_time(task_index):
         app.logger.error(f"Error requesting more time for task {task_index}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/stop_task/<int:task_index>', methods=['POST'])
-def stop_task(task_index):
-    """Stop timer for a specific task"""
-    if 'job_data' not in session:
-        app.logger.error(f"Stop task failed: No job data in session")
-        return jsonify({'error': 'No active job found'}), 400
+@app.route('/stop_task/<int:job_id>/<int:task_order>', methods=['POST'])
+@login_required  
+def stop_task(job_id, task_order):
+    """Stop database-backed timer for a specific task"""
+    from models import JobTask, Timer
     
     try:
-        from datetime import datetime
-        job_data = session['job_data']
+        # Get the job task
+        job_task = JobTask.query.filter_by(
+            job_id=job_id,
+            task_order=task_order
+        ).first_or_404()
         
-        app.logger.info(f"Attempting to stop task {task_index}")
-        app.logger.info(f"Available task_timers: {list(job_data.get('task_timers', {}).keys())}")
+        # Check if user has permission to stop this task
+        if job_task.assigned_to_id != current_user.id:
+            return jsonify({'error': 'Task not assigned to you'}), 403
         
-        task_key = str(task_index)
-        if 'task_timers' not in job_data:
-            app.logger.error(f"No task_timers found in job_data")
-            return jsonify({'error': 'No task timers found'}), 400
-            
-        if task_key not in job_data['task_timers']:
-            app.logger.error(f"Task {task_index} timer not found")
-            return jsonify({'error': f'Timer for task {task_index} not found'}), 400
-            
-        timer_data = job_data['task_timers'][task_key]
-        app.logger.info(f"Timer data for task {task_index}: {timer_data}")
+        # Find the running timer
+        timer = Timer.query.filter_by(
+            job_task_id=job_task.id,
+            user_id=current_user.id,
+            stopped_at=None
+        ).first()
         
-        if timer_data.get('status') != 'running':
-            app.logger.error(f"Timer status is {timer_data.get('status')}, expected 'running'")
-            return jsonify({'error': f'Timer is not running (status: {timer_data.get("status", "unknown")})'}), 400
+        if not timer:
+            return jsonify({'error': 'No running timer found for this task'}), 400
         
-        # Calculate actual time taken
-        start_time = datetime.fromisoformat(timer_data['start_time'])
-        end_time = datetime.now()
-        actual_minutes = (end_time - start_time).total_seconds() / 60
+        # Stop the timer
+        timer.stop()
         
-        timer_data['end_time'] = end_time.isoformat()
-        timer_data['actual_minutes'] = round(actual_minutes, 1)
-        timer_data['status'] = 'completed'
+        # Update job task with timer total
+        job_task.timer_total_seconds += timer.duration_seconds
         
-        session['job_data'] = job_data
-        session.modified = True
+        # Check if task should be marked completed
+        # (This could be expanded with completion criteria)
+        if job_task.status == 'in_progress':
+            # For now, stopping timer keeps task in progress
+            # Task completion would be handled by a separate endpoint
+            pass
         
-        app.logger.info(f"Successfully stopped timer for task {task_index}, actual minutes: {timer_data['actual_minutes']}")
-        return jsonify({'success': True, 'actual_minutes': timer_data['actual_minutes']}), 200
-            
+        # Log activity
+        from models import ActivityLog
+        activity = ActivityLog(
+            job_id=job_task.job_id,
+            user_id=current_user.id,
+            event_type='timer_stopped',
+            payload={
+                'task_id': job_task.task_id,
+                'job_task_id': job_task.id,
+                'task_order': job_task.task_order,
+                'duration_seconds': timer.duration_seconds,
+                'duration_minutes': round(timer.duration_seconds / 60, 1)
+            }
+        )
+        db.session.add(activity)
+        
+        db.session.commit()
+        
+        actual_minutes = round(timer.duration_seconds / 60, 1)
+        app.logger.info(f"Timer stopped for task {task_order} in job {job_id}, duration: {actual_minutes} minutes")
+        
+        return jsonify({
+            'success': True, 
+            'actual_minutes': actual_minutes,
+            'timer_id': timer.id
+        }), 200
+        
     except Exception as e:
-        app.logger.error(f"Error stopping task timer {task_index}: {str(e)}")
-        return jsonify({'error': f'Server error: {str(e)}'}), 500
+        db.session.rollback()
+        app.logger.error(f"Error stopping task timer {task_order}: {str(e)}")
+        return jsonify({'error': f'Failed to stop timer: {str(e)}'}), 500
 
 @app.route('/add_exception/<int:task_index>', methods=['POST'])
 def add_exception(task_index):

@@ -259,13 +259,13 @@
                                             </button>
                                         </form>
                                         {% if job_task.status == 'claimed' %}
-                                        <a href="{{ url_for('task_page', task_index=(job_task.task_order - 1)) }}" class="btn btn-primary">
+                                        <a href="{{ url_for('task_page', job_id=job.id, task_order=job_task.task_order) }}" class="btn btn-primary">
                                             <i class="fas fa-play me-2"></i>Start Work
                                         </a>
                                         {% endif %}
                                     </div>
                                     {% elif job_task.assigned_to_id == current_user.id and job_task.status == 'in_progress' %}
-                                    <a href="{{ url_for('task_page', task_index=(job_task.task_order - 1)) }}" class="btn btn-info">
+                                    <a href="{{ url_for('task_page', job_id=job.id, task_order=job_task.task_order) }}" class="btn btn-info">
                                         <i class="fas fa-arrow-right me-2"></i>Continue
                                     </a>
                                     {% elif job_task.status == 'completed' %}
@@ -284,7 +284,7 @@
                                         <i class="fas fa-check me-2"></i>Completed
                                     </span>
                                     {% else %}
-                                    <a href="{{ url_for('task_page', task_index=(job_task.task_order - 1)) }}" class="btn btn-outline-primary btn-sm">
+                                    <a href="{{ url_for('task_page', job_id=job.id, task_order=job_task.task_order) }}" class="btn btn-outline-primary btn-sm">
                                         <i class="fas fa-eye me-2"></i>View Details
                                     </a>
                                     {% endif %}
