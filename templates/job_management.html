@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Management: {{ job.client_name }} - Drake's Precision Cleaning</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #1a1a1a; color: #e0e0e0; }
+        .card { background-color: #2d2d2d; border: 1px solid #404040; }
+        .card-header { background-color: #383838; border-bottom: 1px solid #404040; }
+        .nav-tabs .nav-link { color: #b0b0b0; border-color: #404040; background-color: #2d2d2d; }
+        .nav-tabs .nav-link.active { color: #fff; background-color: #007bff; border-color: #007bff; }
+        .nav-tabs .nav-link:hover { background-color: #404040; color: #fff; }
+        .list-group-item { background-color: #383838; border-color: #404040; color: #e0e0e0; }
+        .list-group-item:hover { background-color: #454545; }
+        .text-muted { color: #9a9a9a !important; }
+        .progress { background-color: #404040; }
+        .table-dark { --bs-table-bg: #2d2d2d; }
+        .form-select { background-color: #2d2d2d; border-color: #404040; color: #e0e0e0; }
+        .form-select option { background-color: #2d2d2d; color: #e0e0e0; }
+        .alert-info { background-color: #1e3a5f; border-color: #3b7cb8; color: #b8d4ed; }
+        .alert-warning { background-color: #5f4e1e; border-color: #b89a3b; color: #edc975; }
+        .alert-success { background-color: #1e5f2d; border-color: #3bb85a; color: #75ed8f; }
+        
+        .timer-active { animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        
+        .task-row { transition: background-color 0.3s ease; }
+        .task-row:hover { background-color: #3a3a3a !important; }
+        
+        .status-pending { border-left: 4px solid #6c757d; }
+        .status-claimed { border-left: 4px solid #17a2b8; }
+        .status-in_progress { border-left: 4px solid #ffc107; }
+        .status-completed { border-left: 4px solid #28a745; }
+        .status-blocked { border-left: 4px solid #dc3545; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                <i class="fas fa-broom me-2"></i>Drake's Precision Cleaning
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('dashboard') }}">
+                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('job_tasks', job_id=job.id) }}">
+                            <i class="fas fa-tasks me-2"></i>Task View
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user me-2"></i>{{ current_user.name }}
+                            <span class="badge bg-warning ms-2">Coordinator</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark">
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt me-2"></i>Logout
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Job Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h3 class="mb-0">
+                                    <i class="fas fa-home me-2"></i>{{ job.client_name }}
+                                </h3>
+                                <p class="mb-0 text-muted">
+                                    <i class="fas fa-map-marker-alt me-2"></i>{{ job.job_address }}
+                                    {% if job.lot_number %} | Lot {{ job.lot_number }}{% endif %}
+                                </p>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-{{ 'success' if job.status == 'completed' else 'warning' if job.status == 'active' else 'secondary' }} fs-6">
+                                    {{ job.status.title() }}
+                                </span>
+                                <div class="mt-2 small text-muted">
+                                    {{ job.square_footage|int }} sq ft • {{ job.cleaning_type }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Progress Overview</h6>
+                                <div class="progress mb-2" style="height: 25px;">
+                                    <div class="progress-bar" role="progressbar" 
+                                         style="width: {{ progress_percent }}%;" 
+                                         aria-valuenow="{{ progress_percent }}" 
+                                         aria-valuemin="0" aria-valuemax="100">
+                                        {{ progress_percent }}% Complete
+                                    </div>
+                                </div>
+                                <div class="row text-center">
+                                    <div class="col">
+                                        <div class="text-success fw-bold">{{ completed_tasks }}</div>
+                                        <small class="text-muted">Completed</small>
+                                    </div>
+                                    <div class="col">
+                                        <div class="text-warning fw-bold">{{ in_progress_tasks }}</div>
+                                        <small class="text-muted">In Progress</small>
+                                    </div>
+                                    <div class="col">
+                                        <div class="text-info fw-bold">{{ claimed_tasks }}</div>
+                                        <small class="text-muted">Claimed</small>
+                                    </div>
+                                    <div class="col">
+                                        <div class="text-muted fw-bold">{{ total_tasks - completed_tasks - in_progress_tasks - claimed_tasks }}</div>
+                                        <small class="text-muted">Pending</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Team Activity 
+                                    {% if active_timers %}
+                                        <span class="badge bg-success timer-active ms-2">
+                                            <i class="fas fa-play me-1"></i>{{ active_timers|length }} Active
+                                        </span>
+                                    {% endif %}
+                                </h6>
+                                {% if active_timers %}
+                                    {% for timer, job_task in active_timers %}
+                                        <div class="alert alert-info p-2 mb-1">
+                                            <small>
+                                                <strong>{{ timer.user.name }}</strong> working on Task {{ job_task.task_order + 1 }}
+                                                <span class="float-end timer-active">
+                                                    <i class="fas fa-clock text-warning"></i> Active
+                                                </span>
+                                            </small>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="text-muted mb-0">No active work sessions</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard Tabs -->
+        <ul class="nav nav-tabs mb-4" id="managementTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tasks-tab" data-bs-toggle="tab" data-bs-target="#tasks" type="button" role="tab">
+                    <i class="fas fa-tasks me-2"></i>Task Management
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="team-tab" data-bs-toggle="tab" data-bs-target="#team" type="button" role="tab">
+                    <i class="fas fa-users me-2"></i>Team Management <span class="badge bg-secondary ms-1">{{ team_members|length }}</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="activity-tab" data-bs-toggle="tab" data-bs-target="#activity" type="button" role="tab">
+                    <i class="fas fa-history me-2"></i>Activity Log
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="managementTabsContent">
+            <!-- Task Management Tab -->
+            <div class="tab-pane fade show active" id="tasks" role="tabpanel">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tasks me-2"></i>Task Assignment & Progress
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-dark table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px;">#</th>
+                                        <th>Task</th>
+                                        <th>Status</th>
+                                        <th>Assigned To</th>
+                                        <th>Time</th>
+                                        <th style="width: 200px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for job_task in job_tasks %}
+                                        <tr class="task-row status-{{ job_task.status }}">
+                                            <td class="align-middle">{{ job_task.task_order + 1 }}</td>
+                                            <td class="align-middle">
+                                                <div class="fw-bold">{{ job_task.task.name }}</div>
+                                                <small class="text-muted">{{ job_task.task.description[:80] }}...</small>
+                                            </td>
+                                            <td class="align-middle">
+                                                {% set status_colors = {
+                                                    'pending': 'secondary',
+                                                    'claimed': 'info', 
+                                                    'in_progress': 'warning',
+                                                    'completed': 'success',
+                                                    'blocked': 'danger'
+                                                } %}
+                                                <span class="badge bg-{{ status_colors[job_task.status] }}">
+                                                    {{ job_task.status.replace('_', ' ').title() }}
+                                                </span>
+                                            </td>
+                                            <td class="align-middle">
+                                                {% if job_task.assigned_to %}
+                                                    <div>
+                                                        <i class="fas fa-user me-1"></i>{{ job_task.assigned_to.name }}
+                                                        {% if job_task.claimed_at %}
+                                                            <br><small class="text-muted">Since {{ job_task.claimed_at.strftime('%m/%d %I:%M%p') }}</small>
+                                                        {% endif %}
+                                                    </div>
+                                                {% else %}
+                                                    <span class="text-muted">Unassigned</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="align-middle">
+                                                <div>Est: {{ "%.1f"|format(job_task.estimated_minutes) }}m</div>
+                                                {% if job_task.timer_total_seconds > 0 %}
+                                                    <small class="text-info">
+                                                        Actual: {{ "%.1f"|format(job_task.timer_total_seconds / 60) }}m
+                                                    </small>
+                                                {% endif %}
+                                            </td>
+                                            <td class="align-middle">
+                                                <form method="POST" action="{{ url_for('assign_task', job_id=job.id, job_task_id=job_task.id) }}" class="d-flex">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                    <select name="assigned_user_id" class="form-select form-select-sm me-2">
+                                                        <option value="">Unassigned</option>
+                                                        {% for team_member in team_members %}
+                                                            {% if team_member.user.role == 'cleaner' %}
+                                                                <option value="{{ team_member.user.id }}" 
+                                                                        {% if job_task.assigned_to_id == team_member.user.id %}selected{% endif %}>
+                                                                    {{ team_member.user.name }}
+                                                                </option>
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </select>
+                                                    <button type="submit" class="btn btn-primary btn-sm">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Team Management Tab -->
+            <div class="tab-pane fade" id="team" role="tabpanel">
+                <div class="row">
+                    <!-- Add Team Member -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-user-plus me-2"></i>Add Team Member
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                {% if available_cleaners %}
+                                    <form method="POST" action="{{ url_for('add_team_member', job_id=job.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <div class="mb-3">
+                                            <label for="cleaner_id" class="form-label">Select Cleaner</label>
+                                            <select name="cleaner_id" id="cleaner_id" class="form-select" required>
+                                                <option value="">Choose a cleaner...</option>
+                                                {% for cleaner in available_cleaners %}
+                                                    <option value="{{ cleaner.id }}">{{ cleaner.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <button type="submit" class="btn btn-success w-100">
+                                            <i class="fas fa-plus me-2"></i>Add to Team
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        All available cleaners are already on this team.
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Current Team -->
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-users me-2"></i>Current Team ({{ team_members|length }})
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                {% for team_member in team_members %}
+                                    <div class="d-flex justify-content-between align-items-center p-3 mb-2 border rounded">
+                                        <div class="d-flex align-items-center">
+                                            <div class="me-3">
+                                                <i class="fas fa-{{ 'crown' if team_member.user.role == 'coordinator' else 'user' }} fa-2x 
+                                                   text-{{ 'warning' if team_member.user.role == 'coordinator' else 'info' }}"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold">{{ team_member.user.name }}</div>
+                                                <small class="text-muted">
+                                                    <span class="badge bg-{{ 'warning' if team_member.user.role == 'coordinator' else 'info' }}">
+                                                        {{ team_member.user.role.title() }}
+                                                    </span>
+                                                    • Joined {{ team_member.joined_at.strftime('%m/%d/%Y') }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                        {% if team_member.user.role != 'coordinator' %}
+                                            <div>
+                                                <form method="POST" action="{{ url_for('remove_team_member', job_id=job.id, member_id=team_member.user.id) }}" 
+                                                      onsubmit="return confirm('Remove {{ team_member.user.name }} from the team?')" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                        <i class="fas fa-user-times"></i> Remove
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Log Tab -->
+            <div class="tab-pane fade" id="activity" role="tabpanel">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-history me-2"></i>Recent Activity
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        {% if recent_activities %}
+                            {% for activity in recent_activities %}
+                                <div class="d-flex align-items-start mb-3 p-3 border rounded">
+                                    <div class="me-3 mt-1">
+                                        {% set activity_icons = {
+                                            'team_member_added': 'fas fa-user-plus text-success',
+                                            'team_member_removed': 'fas fa-user-times text-danger',
+                                            'task_assigned': 'fas fa-hand-point-right text-info',
+                                            'task_claimed': 'fas fa-hand-paper text-warning',
+                                            'timer_started': 'fas fa-play text-success',
+                                            'timer_stopped': 'fas fa-stop text-danger'
+                                        } %}
+                                        <i class="{{ activity_icons.get(activity.event_type, 'fas fa-info-circle text-muted') }}"></i>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold">
+                                            {% if activity.event_type == 'team_member_added' %}
+                                                {{ activity.user.name }} added {{ activity.payload.get('added_user_name', 'a team member') }} to the team
+                                            {% elif activity.event_type == 'team_member_removed' %}
+                                                {{ activity.user.name }} removed {{ activity.payload.get('removed_user_name', 'a team member') }} from the team
+                                            {% elif activity.event_type == 'task_assigned' %}
+                                                {{ activity.user.name }} assigned Task {{ activity.payload.get('task_order', 0) + 1 }} to {{ activity.payload.get('assigned_user_name', 'someone') }}
+                                            {% elif activity.event_type == 'task_claimed' %}
+                                                {{ activity.user.name }} claimed Task {{ activity.payload.get('task_order', 0) + 1 }}
+                                            {% elif activity.event_type == 'timer_started' %}
+                                                {{ activity.user.name }} started timer for Task {{ activity.payload.get('task_order', 0) + 1 }}
+                                            {% elif activity.event_type == 'timer_stopped' %}
+                                                {{ activity.user.name }} stopped timer for Task {{ activity.payload.get('task_order', 0) + 1 }} ({{ "%.1f"|format(activity.payload.get('duration_minutes', 0)) }}m)
+                                            {% else %}
+                                                {{ activity.user.name }} performed {{ activity.event_type.replace('_', ' ') }}
+                                            {% endif %}
+                                        </div>
+                                        <small class="text-muted">
+                                            <i class="fas fa-clock me-1"></i>{{ activity.timestamp.strftime('%m/%d/%Y %I:%M %p') }}
+                                        </small>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center py-5">
+                                <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                                <h6 class="text-muted">No Recent Activity</h6>
+                                <p class="text-muted">Team activities will appear here as work progresses.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Auto-refresh every 30 seconds to show real-time updates
+        setTimeout(function() {
+            location.reload();
+        }, 30000);
+    </script>
+</body>
+</html>

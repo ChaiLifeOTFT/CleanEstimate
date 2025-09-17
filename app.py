@@ -1419,7 +1419,7 @@ def create_job():
             
             db.session.commit()
             flash(f'Job created successfully! {len(tasks)} tasks added.', 'success')
-            return redirect(url_for('job_detail', job_id=new_job.id))
+            return redirect(url_for('job_management', job_id=new_job.id))
             
         except Exception as e:
             db.session.rollback()
@@ -1427,6 +1427,278 @@ def create_job():
             flash('Failed to create job. Please try again.', 'error')
     
     return render_template('create_job.html')
+
+
+@app.route('/job/<int:job_id>/manage')
+@role_required('coordinator')
+def job_management(job_id):
+    """Comprehensive job management dashboard for coordinators"""
+    from models import Job, JobTask, JobTeamMember, User, ActivityLog, Timer
+    
+    job = Job.query.get_or_404(job_id)
+    
+    # Check if coordinator owns this job
+    if job.coordinator_id != current_user.id:
+        flash('Access denied. You must be the job coordinator.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Get all job tasks with their assigned users and progress
+    job_tasks = db.session.query(JobTask).filter_by(job_id=job_id).order_by(JobTask.task_order).all()
+    
+    # Get team members with their user details - Fix: use proper join and select User objects
+    team_members_query = db.session.query(JobTeamMember).join(User).filter(JobTeamMember.job_id == job_id).all()
+    team_members = []
+    for member in team_members_query:
+        team_members.append(member)  # Now member.user will work due to relationship
+    
+    # Get recent activity for this job
+    recent_activities = ActivityLog.query.filter_by(job_id=job_id).order_by(ActivityLog.timestamp.desc()).limit(10).all()
+    
+    # Calculate progress statistics
+    total_tasks = len(job_tasks)
+    completed_tasks = len([task for task in job_tasks if task.status == 'completed'])
+    in_progress_tasks = len([task for task in job_tasks if task.status == 'in_progress'])
+    claimed_tasks = len([task for task in job_tasks if task.status == 'claimed'])
+    
+    progress_percent = round((completed_tasks / total_tasks * 100), 1) if total_tasks > 0 else 0
+    
+    # Get available cleaners not already on the team - Fix: extract user_id properly
+    current_team_user_ids = [member.user_id for member in team_members]
+    available_cleaners = User.query.filter(
+        User.role == 'cleaner',
+        ~User.id.in_(current_team_user_ids),
+        User.active == True
+    ).all()
+    
+    # Get active timers for real-time tracking - Fix: add explicit join condition
+    active_timers = db.session.query(Timer, JobTask).join(
+        JobTask, Timer.job_task_id == JobTask.id
+    ).filter(
+        JobTask.job_id == job_id,
+        Timer.stopped_at == None
+    ).all()
+    
+    return render_template('job_management.html',
+                         job=job,
+                         job_tasks=job_tasks,
+                         team_members=team_members,
+                         recent_activities=recent_activities,
+                         available_cleaners=available_cleaners,
+                         active_timers=active_timers,
+                         total_tasks=total_tasks,
+                         completed_tasks=completed_tasks,
+                         in_progress_tasks=in_progress_tasks,
+                         claimed_tasks=claimed_tasks,
+                         progress_percent=progress_percent)
+
+
+@app.route('/job/<int:job_id>/add_team_member', methods=['POST'])
+@role_required('coordinator') 
+def add_team_member(job_id):
+    """Add a cleaner to the job team"""
+    from models import Job, JobTeamMember, User
+    
+    job = Job.query.get_or_404(job_id)
+    
+    if job.coordinator_id != current_user.id:
+        flash('Access denied. You must be the job coordinator.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    cleaner_id = request.form.get('cleaner_id', type=int)
+    if not cleaner_id:
+        flash('Please select a cleaner to add.', 'error')
+        return redirect(url_for('job_management', job_id=job_id))
+    
+    cleaner = User.query.get_or_404(cleaner_id)
+    if cleaner.role != 'cleaner':
+        flash('Only cleaners can be added to teams.', 'error')
+        return redirect(url_for('job_management', job_id=job_id))
+    
+    # Check if already on team
+    existing = JobTeamMember.query.filter_by(job_id=job_id, user_id=cleaner_id).first()
+    if existing:
+        flash(f'{cleaner.name} is already on the team.', 'error')
+        return redirect(url_for('job_management', job_id=job_id))
+    
+    try:
+        # Add to team
+        team_member = JobTeamMember(
+            job_id=job_id,
+            user_id=cleaner_id,
+            role='cleaner'
+        )
+        db.session.add(team_member)
+        
+        # Log activity
+        from models import ActivityLog
+        activity = ActivityLog(
+            job_id=job_id,
+            user_id=current_user.id,
+            event_type='team_member_added',
+            payload={'added_user_id': cleaner_id, 'added_user_name': cleaner.name}
+        )
+        db.session.add(activity)
+        
+        db.session.commit()
+        flash(f'{cleaner.name} has been added to the team!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error adding team member: {str(e)}")
+        flash('Failed to add team member. Please try again.', 'error')
+    
+    return redirect(url_for('job_management', job_id=job_id))
+
+
+@app.route('/job/<int:job_id>/remove_team_member/<int:member_id>', methods=['POST'])
+@role_required('coordinator')
+def remove_team_member(job_id, member_id):
+    """Remove a cleaner from the job team"""
+    from models import Job, JobTeamMember, User, JobTask
+    
+    job = Job.query.get_or_404(job_id)
+    
+    if job.coordinator_id != current_user.id:
+        flash('Access denied. You must be the job coordinator.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    # Find the team member
+    team_member = JobTeamMember.query.filter_by(
+        job_id=job_id, 
+        user_id=member_id
+    ).first_or_404()
+    
+    # Don't allow removing the coordinator
+    if team_member.role == 'coordinator':
+        flash('Cannot remove the job coordinator from the team.', 'error')
+        return redirect(url_for('job_management', job_id=job_id))
+    
+    # Check if user has active tasks
+    active_tasks = JobTask.query.filter_by(
+        job_id=job_id,
+        assigned_to_id=member_id
+    ).filter(JobTask.status.in_(['claimed', 'in_progress'])).all()
+    
+    if active_tasks:
+        task_names = [f"Task {task.task_order + 1}" for task in active_tasks]
+        flash(f'Cannot remove {team_member.user.name} - they have active tasks: {", ".join(task_names)}', 'error')
+        return redirect(url_for('job_management', job_id=job_id))
+    
+    try:
+        user_name = team_member.user.name
+        
+        # Release any assigned tasks back to pending
+        assigned_tasks = JobTask.query.filter_by(
+            job_id=job_id,
+            assigned_to_id=member_id
+        ).all()
+        
+        for task in assigned_tasks:
+            task.assigned_to_id = None
+            task.status = 'pending'
+            task.claimed_at = None
+        
+        # Remove from team
+        db.session.delete(team_member)
+        
+        # Log activity
+        from models import ActivityLog
+        activity = ActivityLog(
+            job_id=job_id,
+            user_id=current_user.id,
+            event_type='team_member_removed',
+            payload={'removed_user_id': member_id, 'removed_user_name': user_name}
+        )
+        db.session.add(activity)
+        
+        db.session.commit()
+        flash(f'{user_name} has been removed from the team.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error removing team member: {str(e)}")
+        flash('Failed to remove team member. Please try again.', 'error')
+    
+    return redirect(url_for('job_management', job_id=job_id))
+
+
+@app.route('/job/<int:job_id>/assign_task/<int:job_task_id>', methods=['POST'])
+@role_required('coordinator')
+def assign_task(job_id, job_task_id):
+    """Assign a specific task to a team member"""
+    from models import Job, JobTask, JobTeamMember, User
+    
+    job = Job.query.get_or_404(job_id)
+    
+    if job.coordinator_id != current_user.id:
+        flash('Access denied. You must be the job coordinator.', 'error')
+        return redirect(url_for('dashboard'))
+    
+    job_task = JobTask.query.get_or_404(job_task_id)
+    if job_task.job_id != job_id:
+        flash('Task does not belong to this job.', 'error')
+        return redirect(url_for('job_management', job_id=job_id))
+    
+    assigned_user_id = request.form.get('assigned_user_id', type=int)
+    
+    if not assigned_user_id:
+        # Unassign task
+        job_task.assigned_to_id = None
+        if job_task.status == 'claimed':
+            job_task.status = 'pending'
+            job_task.claimed_at = None
+        flash_message = f'Task {job_task.task_order + 1} has been unassigned.'
+        activity_payload = {'task_order': job_task.task_order, 'action': 'unassigned'}
+    else:
+        # Assign task to user
+        user = User.query.get_or_404(assigned_user_id)
+        
+        # Verify user is on the team
+        team_member = JobTeamMember.query.filter_by(
+            job_id=job_id, 
+            user_id=assigned_user_id
+        ).first()
+        
+        if not team_member:
+            flash(f'{user.name} is not on the job team.', 'error')
+            return redirect(url_for('job_management', job_id=job_id))
+        
+        # Check if task is available for assignment
+        if job_task.status not in ['pending', 'claimed']:
+            flash('Task cannot be reassigned while in progress.', 'error')
+            return redirect(url_for('job_management', job_id=job_id))
+        
+        job_task.assigned_to_id = assigned_user_id
+        job_task.status = 'claimed'
+        job_task.claimed_at = datetime.now(timezone.utc)
+        flash_message = f'Task {job_task.task_order + 1} assigned to {user.name}.'
+        activity_payload = {
+            'task_order': job_task.task_order,
+            'assigned_user_id': assigned_user_id,
+            'assigned_user_name': user.name,
+            'action': 'assigned'
+        }
+    
+    try:
+        # Log activity
+        from models import ActivityLog
+        activity = ActivityLog(
+            job_id=job_id,
+            user_id=current_user.id,
+            event_type='task_assigned',
+            payload=activity_payload
+        )
+        db.session.add(activity)
+        
+        db.session.commit()
+        flash(flash_message, 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error assigning task: {str(e)}")
+        flash('Failed to assign task. Please try again.', 'error')
+    
+    return redirect(url_for('job_management', job_id=job_id))
 
 
 @app.route('/claim_task/<int:job_task_id>', methods=['POST'])

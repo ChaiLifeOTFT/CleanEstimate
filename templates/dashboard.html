@@ -136,7 +136,7 @@
                                             <small class="text-muted">
                                                 <i class="fas fa-clock me-1"></i>{{ "%.1f"|format(job.total_estimated_minutes or 0) }} min est.
                                             </small>
-                                            <a href="#" class="btn btn-outline-primary btn-sm">
+                                            <a href="{{ url_for('job_tasks', job_id=job.id) }}" class="btn btn-outline-primary btn-sm">
                                                 <i class="fas fa-eye me-1"></i>View Tasks
                                             </a>
                                         </div>
@@ -194,7 +194,7 @@
                                                 <small class="text-muted">
                                                     <i class="fas fa-clock me-1"></i>{{ "%.1f"|format(job.total_estimated_minutes or 0) }} min est.
                                                 </small>
-                                                <a href="#" class="btn btn-outline-primary btn-sm">
+                                                <a href="{{ url_for('job_management', job_id=job.id) }}" class="btn btn-outline-primary btn-sm">
                                                     <i class="fas fa-cog me-1"></i>Manage
                                                 </a>
                                             </div>
