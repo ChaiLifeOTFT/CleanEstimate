@@ -2,7 +2,7 @@ import os
 import logging
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, login_required, current_user
+from flask_login import LoginManager, login_required, current_user, UserMixin, login_user, logout_user
 from flask_wtf.csrf import CSRFProtect
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -49,7 +49,7 @@ db.init_app(app)
 # Configure Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login'
+login_manager.login_view = 'login'  # type: ignore
 login_manager.login_message = 'Please log in to access this page.'
 
 # Configure CSRF Protection
@@ -82,7 +82,7 @@ with app.app_context():
     db.create_all()
 
 # Session configuration for better persistence
-from datetime import timedelta
+from datetime import datetime, timezone, timedelta
 app.permanent_session_lifetime = timedelta(hours=24)
 
 # Production-ready session security settings
@@ -559,7 +559,7 @@ def start_task(job_id, task_order):
             return jsonify({'error': 'Timer is already running for this task'}), 400
         
         # Create new timer
-        timer = Timer(
+        timer = Timer(  # type: ignore
             job_task_id=job_task.id,
             user_id=current_user.id,
             started_at=datetime.now(timezone.utc)
@@ -572,7 +572,7 @@ def start_task(job_id, task_order):
         
         # Log activity
         from models import ActivityLog
-        activity = ActivityLog(
+        activity = ActivityLog(  # type: ignore
             job_id=job_task.job_id,
             user_id=current_user.id,
             event_type='timer_started',

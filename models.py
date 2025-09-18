@@ -161,7 +161,7 @@ class JobTask(db.Model):
             # Use pessimistic locking to prevent race conditions
             from sqlalchemy import and_
             locked_task = db.session.query(JobTask).filter(
-                and_(
+                and_(  # type: ignore
                     JobTask.id == self.id,
                     JobTask.lock_version == self.lock_version,
                     JobTask.status == 'pending'
@@ -179,7 +179,7 @@ class JobTask(db.Model):
             
             # Log the claiming activity
             from models import ActivityLog
-            activity = ActivityLog(
+            activity = ActivityLog(  # type: ignore
                 job_id=locked_task.job_id,
                 user_id=user_id,
                 event_type='task_claimed',
@@ -211,7 +211,7 @@ class JobTask(db.Model):
             
             # Log the release activity
             from models import ActivityLog
-            activity = ActivityLog(
+            activity = ActivityLog(  # type: ignore
                 job_id=self.job_id,
                 user_id=user_id,
                 event_type='task_released',
