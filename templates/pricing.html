@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    <title>Pricing - Drake's Precision Cleaning</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #1a1a1a; color: #e0e0e0; }
+        .card { background-color: #2d2d2d; border: 1px solid #404040; transition: transform 0.2s, box-shadow 0.2s; }
+        .card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.4); }
+        .card-popular { border: 2px solid #0d6efd; }
+        .card-popular .card-header { background: linear-gradient(135deg, #0d6efd 0%, #0056e0 100%); }
+        .card-header { background-color: #383838; border-bottom: 1px solid #404040; }
+        .price-tag { font-size: 3rem; font-weight: 700; }
+        .price-period { font-size: 1rem; color: #9a9a9a; }
+        .feature-list { list-style: none; padding: 0; }
+        .feature-list li { padding: 8px 0; border-bottom: 1px solid #3a3a3a; }
+        .feature-list li:last-child { border-bottom: none; }
+        .feature-list .fa-check { color: #28a745; }
+        .feature-list .fa-times { color: #6c757d; }
+        .badge-current { background: #28a745; }
+        .text-muted { color: #9a9a9a !important; }
+        .navbar { border-bottom: 1px solid #404040; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-broom me-2"></i>Drake's Precision Cleaning
+            </a>
+            <div class="navbar-nav ms-auto">
+                {% if current_user.is_authenticated %}
+                    <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+                    <a class="nav-link" href="{{ url_for('billing') }}">Billing</a>
+                    <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+                {% else %}
+                    <a class="nav-link" href="{{ url_for('login') }}">Login</a>
+                    <a class="nav-link" href="{{ url_for('register') }}">Sign Up</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+        <div class="text-center mb-5">
+            <h1 class="fw-bold">Simple, Transparent Pricing</h1>
+            <p class="lead text-muted">Scale your cleaning operation. Upgrade or cancel anytime.</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{% if category == 'error' %}danger{% else %}{{ category }}{% endif %} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="row g-4 justify-content-center">
+            <!-- Free -->
+            <div class="col-lg-3 col-md-6">
+                <div class="card h-100 text-center">
+                    <div class="card-header py-3">
+                        <h4 class="mb-0">Free</h4>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-4">
+                            <span class="price-tag">$0</span>
+                            <span class="price-period">/month</span>
+                        </div>
+                        <ul class="feature-list text-start flex-grow-1">
+                            <li><i class="fas fa-check me-2"></i>2 team members</li>
+                            <li><i class="fas fa-check me-2"></i>5 active jobs</li>
+                            <li><i class="fas fa-check me-2"></i>Task tracking & timers</li>
+                            <li><i class="fas fa-check me-2"></i>Before/after photos</li>
+                            <li><i class="fas fa-times me-2"></i>Email reports</li>
+                            <li><i class="fas fa-times me-2"></i>PDF reports</li>
+                            <li><i class="fas fa-times me-2"></i>AI assistant</li>
+                        </ul>
+                        {% if current_plan == 'free' %}
+                            <span class="btn btn-outline-success disabled mt-3">
+                                <i class="fas fa-check me-1"></i>Current Plan
+                            </span>
+                        {% else %}
+                            <span class="btn btn-outline-secondary disabled mt-3">Free Tier</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Starter -->
+            <div class="col-lg-3 col-md-6">
+                <div class="card h-100 text-center">
+                    <div class="card-header py-3">
+                        <h4 class="mb-0">Starter</h4>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-4">
+                            <span class="price-tag">$29</span>
+                            <span class="price-period">/month</span>
+                        </div>
+                        <ul class="feature-list text-start flex-grow-1">
+                            <li><i class="fas fa-check me-2"></i><strong>5</strong> team members</li>
+                            <li><i class="fas fa-check me-2"></i><strong>25</strong> active jobs</li>
+                            <li><i class="fas fa-check me-2"></i>Task tracking & timers</li>
+                            <li><i class="fas fa-check me-2"></i>Before/after photos</li>
+                            <li><i class="fas fa-check me-2"></i>Email reports</li>
+                            <li><i class="fas fa-check me-2"></i>PDF reports</li>
+                            <li><i class="fas fa-times me-2"></i>AI assistant</li>
+                        </ul>
+                        {% if current_plan == 'starter' %}
+                            <span class="btn btn-outline-success disabled mt-3">
+                                <i class="fas fa-check me-1"></i>Current Plan
+                            </span>
+                        {% else %}
+                            <form action="{{ url_for('subscribe', plan='starter') }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-primary w-100 mt-3">
+                                    {% if current_user.is_authenticated %}
+                                        Get Starter
+                                    {% else %}
+                                        Sign Up
+                                    {% endif %}
+                                </button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pro (Popular) -->
+            <div class="col-lg-3 col-md-6">
+                <div class="card card-popular h-100 text-center">
+                    <div class="card-header py-3">
+                        <h4 class="mb-0 text-white">Pro <span class="badge bg-warning text-dark ms-2">Popular</span></h4>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-4">
+                            <span class="price-tag">$79</span>
+                            <span class="price-period">/month</span>
+                        </div>
+                        <ul class="feature-list text-start flex-grow-1">
+                            <li><i class="fas fa-check me-2"></i><strong>15</strong> team members</li>
+                            <li><i class="fas fa-check me-2"></i><strong>100</strong> active jobs</li>
+                            <li><i class="fas fa-check me-2"></i>Task tracking & timers</li>
+                            <li><i class="fas fa-check me-2"></i>Before/after photos</li>
+                            <li><i class="fas fa-check me-2"></i>Email reports</li>
+                            <li><i class="fas fa-check me-2"></i>PDF reports</li>
+                            <li><i class="fas fa-check me-2"></i><strong>AI assistant</strong></li>
+                        </ul>
+                        {% if current_plan == 'pro' %}
+                            <span class="btn btn-success disabled mt-3">
+                                <i class="fas fa-check me-1"></i>Current Plan
+                            </span>
+                        {% else %}
+                            <form action="{{ url_for('subscribe', plan='pro') }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-primary w-100 mt-3 fw-bold">
+                                    {% if current_user.is_authenticated %}
+                                        Get Pro
+                                    {% else %}
+                                        Sign Up
+                                    {% endif %}
+                                </button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enterprise -->
+            <div class="col-lg-3 col-md-6">
+                <div class="card h-100 text-center">
+                    <div class="card-header py-3">
+                        <h4 class="mb-0">Enterprise</h4>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-4">
+                            <span class="price-tag">$149</span>
+                            <span class="price-period">/month</span>
+                        </div>
+                        <ul class="feature-list text-start flex-grow-1">
+                            <li><i class="fas fa-check me-2"></i><strong>50</strong> team members</li>
+                            <li><i class="fas fa-check me-2"></i><strong>Unlimited</strong> jobs</li>
+                            <li><i class="fas fa-check me-2"></i>Task tracking & timers</li>
+                            <li><i class="fas fa-check me-2"></i>Before/after photos</li>
+                            <li><i class="fas fa-check me-2"></i>Email reports</li>
+                            <li><i class="fas fa-check me-2"></i>PDF reports</li>
+                            <li><i class="fas fa-check me-2"></i><strong>AI assistant</strong></li>
+                        </ul>
+                        {% if current_plan == 'enterprise' %}
+                            <span class="btn btn-outline-success disabled mt-3">
+                                <i class="fas fa-check me-1"></i>Current Plan
+                            </span>
+                        {% else %}
+                            <form action="{{ url_for('subscribe', plan='enterprise') }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-outline-primary w-100 mt-3">
+                                    {% if current_user.is_authenticated %}
+                                        Get Enterprise
+                                    {% else %}
+                                        Sign Up
+                                    {% endif %}
+                                </button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-5 text-muted">
+            <p><i class="fas fa-lock me-1"></i>Secure payments powered by Stripe. Cancel anytime.</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js');
+}
+</script>
+</body>
+</html>

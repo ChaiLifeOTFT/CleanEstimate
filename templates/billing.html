@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    <title>Billing - Drake's Precision Cleaning</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #1a1a1a; color: #e0e0e0; }
+        .card { background-color: #2d2d2d; border: 1px solid #404040; }
+        .card-header { background-color: #383838; border-bottom: 1px solid #404040; }
+        .text-muted { color: #9a9a9a !important; }
+        .list-group-item { background-color: #383838; border-color: #404040; color: #e0e0e0; }
+        .navbar { border-bottom: 1px solid #404040; }
+        .plan-badge { font-size: 1.1rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                <i class="fas fa-broom me-2"></i>Drake's Precision Cleaning
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a class="nav-link active" href="{{ url_for('billing') }}">Billing</a>
+                <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+        <h2 class="mb-4"><i class="fas fa-credit-card me-2"></i>Billing & Subscription</h2>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{% if category == 'error' %}danger{% else %}{{ category }}{% endif %} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="row g-4">
+            <!-- Current Plan -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Current Plan</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <h3 class="mb-0 me-3">{{ subscription.plan.title() }}</h3>
+                            {% if subscription.is_active %}
+                                <span class="badge bg-success plan-badge">Active</span>
+                            {% elif subscription.status == 'past_due' %}
+                                <span class="badge bg-warning plan-badge">Past Due</span>
+                            {% else %}
+                                <span class="badge bg-secondary plan-badge">{{ subscription.status.title() }}</span>
+                            {% endif %}
+                        </div>
+
+                        {% if subscription.cancel_at_period_end %}
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                Your subscription will cancel at the end of the current billing period.
+                            </div>
+                        {% endif %}
+
+                        <ul class="list-group mb-3">
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Team members</span>
+                                <strong>{{ subscription.max_team_members }}</strong>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Active jobs</span>
+                                <strong>{% if subscription.max_active_jobs >= 999 %}Unlimited{% else %}{{ subscription.max_active_jobs }}{% endif %}</strong>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Monthly price</span>
+                                <strong>${{ subscription.plan_limits['price_monthly'] }}/mo</strong>
+                            </li>
+                            {% if subscription.current_period_end %}
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Next billing date</span>
+                                <strong>{{ subscription.current_period_end.strftime('%b %d, %Y') }}</strong>
+                            </li>
+                            {% endif %}
+                        </ul>
+
+                        <div class="d-flex gap-2">
+                            {% if subscription.plan != 'free' and subscription.stripe_subscription_id %}
+                                <form action="{{ url_for('billing_portal') }}" method="POST" class="flex-grow-1">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-outline-primary w-100">
+                                        <i class="fas fa-external-link-alt me-1"></i>Manage Subscription
+                                    </button>
+                                </form>
+                            {% endif %}
+                            <a href="{{ url_for('pricing') }}" class="btn btn-outline-light {% if subscription.plan == 'free' %}flex-grow-1{% endif %}">
+                                {% if subscription.plan == 'free' %}
+                                    <i class="fas fa-arrow-up me-1"></i>Upgrade Plan
+                                {% else %}
+                                    <i class="fas fa-exchange-alt me-1"></i>Change Plan
+                                {% endif %}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plan Features -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-star me-2"></i>Your Features</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group">
+                            <li class="list-group-item">
+                                <i class="fas fa-check text-success me-2"></i>Task tracking & timers
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-check text-success me-2"></i>Team coordination
+                            </li>
+                            <li class="list-group-item">
+                                <i class="fas fa-check text-success me-2"></i>Before/after photos
+                            </li>
+                            <li class="list-group-item">
+                                {% if subscription.plan in ('starter', 'pro', 'enterprise') %}
+                                    <i class="fas fa-check text-success me-2"></i>
+                                {% else %}
+                                    <i class="fas fa-lock text-muted me-2"></i>
+                                {% endif %}
+                                Email reports
+                            </li>
+                            <li class="list-group-item">
+                                {% if subscription.plan in ('starter', 'pro', 'enterprise') %}
+                                    <i class="fas fa-check text-success me-2"></i>
+                                {% else %}
+                                    <i class="fas fa-lock text-muted me-2"></i>
+                                {% endif %}
+                                PDF generation
+                            </li>
+                            <li class="list-group-item">
+                                {% if subscription.plan in ('pro', 'enterprise') %}
+                                    <i class="fas fa-check text-success me-2"></i>
+                                {% else %}
+                                    <i class="fas fa-lock text-muted me-2"></i>
+                                {% endif %}
+                                AI cleaning assistant
+                            </li>
+                            <li class="list-group-item">
+                                {% if subscription.plan == 'enterprise' %}
+                                    <i class="fas fa-check text-success me-2"></i>
+                                {% else %}
+                                    <i class="fas fa-lock text-muted me-2"></i>
+                                {% endif %}
+                                Priority support
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js');
+}
+</script>
+</body>
+</html>

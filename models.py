@@ -15,9 +15,11 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256))
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     active = db.Column(db.Boolean, default=True)
-    
+    stripe_customer_id = db.Column(db.String(255), nullable=True, index=True)
+
     # Relationships
     coordinated_jobs = db.relationship('Job', backref='coordinator', lazy=True, foreign_keys='Job.coordinator_id')
+    subscription = db.relationship('Subscription', backref='user', uselist=False, lazy=True)
     assigned_tasks = db.relationship('JobTask', backref='assigned_to', lazy=True, foreign_keys='JobTask.assigned_to_id')
     timers = db.relationship('Timer', backref='user', lazy=True)
     uploaded_photos = db.relationship('Photo', backref='uploaded_by_user', lazy=True, foreign_keys='Photo.uploaded_by_id')
@@ -312,3 +314,46 @@ class ActivityLog(db.Model):
 
     def __repr__(self):
         return f'<ActivityLog {self.event_type} by {self.user_id}>'
+
+
+class Subscription(db.Model):
+    __tablename__ = 'subscriptions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True, index=True)
+    stripe_subscription_id = db.Column(db.String(255), nullable=True, index=True)
+    stripe_price_id = db.Column(db.String(255), nullable=True)
+    plan = db.Column(db.String(20), nullable=False, default='free')  # 'free', 'starter', 'pro', 'enterprise'
+    status = db.Column(db.String(20), nullable=False, default='active')  # 'active', 'past_due', 'canceled', 'trialing'
+    current_period_end = db.Column(db.DateTime, nullable=True)
+    cancel_at_period_end = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Plan limits
+    max_team_members = db.Column(db.Integer, default=2)
+    max_active_jobs = db.Column(db.Integer, default=5)
+
+    PLAN_LIMITS = {
+        'free':       {'team': 2,  'jobs': 5,   'price_monthly': 0},
+        'starter':    {'team': 5,  'jobs': 25,  'price_monthly': 29},
+        'pro':        {'team': 15, 'jobs': 100, 'price_monthly': 79},
+        'enterprise': {'team': 50, 'jobs': 999, 'price_monthly': 149},
+    }
+
+    @property
+    def is_active(self):
+        if self.plan == 'free':
+            return True
+        if self.status in ('active', 'trialing'):
+            return True
+        if self.status == 'past_due':
+            return True  # grace period
+        return False
+
+    @property
+    def plan_limits(self):
+        return self.PLAN_LIMITS.get(self.plan, self.PLAN_LIMITS['free'])
+
+    def __repr__(self):
+        return f'<Subscription {self.user_id} plan={self.plan} status={self.status}>'

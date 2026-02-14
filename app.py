@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 import uuid
 import json
 import sys
+import stripe
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail, Email, To, Content
 import qrcode
@@ -101,6 +102,19 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 
 # Ensure upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Initialize Stripe
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+APP_DOMAIN = os.environ.get('APP_DOMAIN', 'http://localhost:5000')
+
+# Stripe Price IDs - set these after creating products in Stripe Dashboard
+STRIPE_PRICES = {
+    'starter_monthly':    os.environ.get('STRIPE_PRICE_STARTER', ''),
+    'pro_monthly':        os.environ.get('STRIPE_PRICE_PRO', ''),
+    'enterprise_monthly': os.environ.get('STRIPE_PRICE_ENTERPRISE', ''),
+}
 
 # Task library with comprehensive cleaning guidance including products, methods, and safety
 task_library = {
@@ -1833,6 +1847,296 @@ def populate_tasks():
 def submitted():
     """Results page - redirect to home if accessed directly"""
     return redirect(url_for('index'))
+
+# ─── Stripe Billing ─────────────────────────────────────────────────────
+
+def ensure_subscription(user):
+    """Ensure user has a subscription record (creates free tier if missing)."""
+    from models import Subscription
+    if not user.subscription:
+        sub = Subscription(
+            user_id=user.id,
+            plan='free',
+            status='active',
+            max_team_members=2,
+            max_active_jobs=5,
+        )
+        db.session.add(sub)
+        db.session.commit()
+    return user.subscription
+
+
+def get_or_create_stripe_customer(user):
+    """Get or create a Stripe customer for this user."""
+    if user.stripe_customer_id:
+        return user.stripe_customer_id
+    customer = stripe.Customer.create(
+        email=user.email,
+        name=user.name,
+        metadata={'user_id': str(user.id)},
+    )
+    user.stripe_customer_id = customer.id
+    db.session.commit()
+    return customer.id
+
+
+@app.route('/pricing')
+def pricing():
+    """Pricing page with subscription tiers."""
+    from models import Subscription
+    current_plan = 'free'
+    if current_user.is_authenticated:
+        sub = ensure_subscription(current_user)
+        current_plan = sub.plan
+    return render_template('pricing.html',
+                           current_plan=current_plan,
+                           stripe_key=STRIPE_PUBLISHABLE_KEY,
+                           prices=STRIPE_PRICES)
+
+
+@app.route('/subscribe/<plan>', methods=['POST'])
+@login_required
+def subscribe(plan):
+    """Create Stripe Checkout session for a subscription plan."""
+    if plan not in ('starter', 'pro', 'enterprise'):
+        flash('Invalid plan selected.', 'error')
+        return redirect(url_for('pricing'))
+
+    price_id = STRIPE_PRICES.get(f'{plan}_monthly')
+    if not price_id:
+        flash('Stripe is not configured yet. Set STRIPE_PRICE_* env vars.', 'error')
+        return redirect(url_for('pricing'))
+
+    if not stripe.api_key:
+        flash('Stripe is not configured. Set STRIPE_SECRET_KEY env var.', 'error')
+        return redirect(url_for('pricing'))
+
+    try:
+        customer_id = get_or_create_stripe_customer(current_user)
+
+        checkout_session = stripe.checkout.Session.create(
+            customer=customer_id,
+            line_items=[{'price': price_id, 'quantity': 1}],
+            mode='subscription',
+            success_url=APP_DOMAIN + url_for('billing_success') + '?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=APP_DOMAIN + url_for('pricing'),
+            metadata={'user_id': str(current_user.id), 'plan': plan},
+        )
+        return redirect(checkout_session.url, code=303)
+
+    except stripe.StripeError as e:
+        app.logger.error(f"Stripe checkout error: {e}")
+        flash('Payment processing error. Please try again.', 'error')
+        return redirect(url_for('pricing'))
+
+
+@app.route('/billing/success')
+@login_required
+def billing_success():
+    """Handle successful Stripe checkout."""
+    session_id = request.args.get('session_id')
+    if session_id:
+        try:
+            checkout = stripe.checkout.Session.retrieve(session_id, expand=['subscription'])
+            sub_obj = checkout.subscription
+
+            if sub_obj:
+                from models import Subscription
+                sub = ensure_subscription(current_user)
+
+                # Determine plan from metadata or price
+                plan = checkout.metadata.get('plan', 'starter')
+
+                sub.stripe_subscription_id = sub_obj.id if isinstance(sub_obj, str) else sub_obj.id
+                sub.stripe_price_id = checkout.metadata.get('price_id', '')
+                sub.plan = plan
+                sub.status = 'active'
+                limits = Subscription.PLAN_LIMITS.get(plan, Subscription.PLAN_LIMITS['starter'])
+                sub.max_team_members = limits['team']
+                sub.max_active_jobs = limits['jobs']
+
+                if hasattr(sub_obj, 'current_period_end') and sub_obj.current_period_end:
+                    sub.current_period_end = datetime.fromtimestamp(sub_obj.current_period_end, tz=timezone.utc)
+
+                db.session.commit()
+                flash(f'Subscribed to {plan.title()} plan! Your team is ready.', 'success')
+        except Exception as e:
+            app.logger.error(f"Error processing billing success: {e}")
+            flash('Payment received! Your account will be updated shortly.', 'info')
+
+    return redirect(url_for('billing'))
+
+
+@app.route('/billing')
+@login_required
+def billing():
+    """Billing dashboard showing current plan and manage options."""
+    from models import Subscription
+    sub = ensure_subscription(current_user)
+    return render_template('billing.html', subscription=sub, stripe_key=STRIPE_PUBLISHABLE_KEY)
+
+
+@app.route('/billing/portal', methods=['POST'])
+@login_required
+def billing_portal():
+    """Redirect to Stripe Customer Portal for plan management."""
+    if not current_user.stripe_customer_id:
+        flash('No billing account found.', 'error')
+        return redirect(url_for('billing'))
+
+    if not stripe.api_key:
+        flash('Stripe not configured.', 'error')
+        return redirect(url_for('billing'))
+
+    try:
+        portal = stripe.billing_portal.Session.create(
+            customer=current_user.stripe_customer_id,
+            return_url=APP_DOMAIN + url_for('billing'),
+        )
+        return redirect(portal.url, code=303)
+    except stripe.StripeError as e:
+        app.logger.error(f"Stripe portal error: {e}")
+        flash('Could not open billing portal. Please try again.', 'error')
+        return redirect(url_for('billing'))
+
+
+@app.route('/stripe/webhook', methods=['POST'])
+@csrf.exempt
+def stripe_webhook():
+    """Handle Stripe webhook events."""
+    payload = request.get_data(as_text=True)
+    sig_header = request.headers.get('Stripe-Signature')
+
+    if STRIPE_WEBHOOK_SECRET and sig_header:
+        try:
+            event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+        except (ValueError, stripe.SignatureVerificationError) as e:
+            app.logger.error(f"Webhook signature failed: {e}")
+            return jsonify({'error': 'Invalid signature'}), 400
+    else:
+        event = json.loads(payload)
+
+    event_type = event.get('type', '')
+    data = event.get('data', {}).get('object', {})
+
+    app.logger.info(f"Stripe webhook: {event_type}")
+
+    from models import Subscription, User
+
+    if event_type == 'checkout.session.completed':
+        _handle_checkout_completed(data)
+    elif event_type == 'customer.subscription.created':
+        _handle_subscription_update(data)
+    elif event_type == 'customer.subscription.updated':
+        _handle_subscription_update(data)
+    elif event_type == 'customer.subscription.deleted':
+        _handle_subscription_deleted(data)
+    elif event_type == 'invoice.payment_failed':
+        _handle_payment_failed(data)
+
+    return jsonify({'status': 'ok'}), 200
+
+
+def _handle_checkout_completed(session_data):
+    """Activate subscription after successful checkout payment."""
+    from models import Subscription, User
+    from datetime import datetime, timezone
+
+    user_id = session_data.get('metadata', {}).get('user_id')
+    plan = session_data.get('metadata', {}).get('plan', 'starter')
+    stripe_sub_id = session_data.get('subscription')
+    customer_id = session_data.get('customer')
+
+    if not user_id or not stripe_sub_id:
+        app.logger.error(f"Checkout completed but missing user_id or subscription: {session_data}")
+        return
+
+    user = User.query.get(int(user_id))
+    if not user:
+        app.logger.error(f"Checkout completed for unknown user_id: {user_id}")
+        return
+
+    # Update stripe customer id on user if needed
+    if customer_id and not user.stripe_customer_id:
+        user.stripe_customer_id = customer_id
+
+    # Fetch subscription details from Stripe
+    stripe_sub = stripe.Subscription.retrieve(stripe_sub_id)
+    period_end = datetime.fromtimestamp(stripe_sub.current_period_end, tz=timezone.utc) if stripe_sub.current_period_end else None
+
+    # Get plan limits
+    limits = Subscription.PLAN_LIMITS.get(plan, Subscription.PLAN_LIMITS['starter'])
+
+    # Create or update subscription record
+    sub = Subscription.query.filter_by(user_id=user.id).first()
+    if not sub:
+        sub = Subscription(user_id=user.id)
+        db.session.add(sub)
+
+    sub.stripe_subscription_id = stripe_sub_id
+    sub.stripe_price_id = stripe_sub.items.data[0].price.id if stripe_sub.items.data else None
+    sub.plan = plan
+    sub.status = 'active'
+    sub.current_period_end = period_end
+    sub.cancel_at_period_end = stripe_sub.cancel_at_period_end
+    sub.max_team_members = limits['team']
+    sub.max_active_jobs = limits['jobs']
+
+    db.session.commit()
+    app.logger.info(f"Subscription activated: user={user_id}, plan={plan}, stripe_sub={stripe_sub_id}")
+
+
+def _handle_subscription_update(sub_data):
+    """Process subscription update from Stripe."""
+    from models import Subscription, User
+    stripe_sub_id = sub_data.get('id')
+    sub = Subscription.query.filter_by(stripe_subscription_id=stripe_sub_id).first()
+    if not sub:
+        return
+
+    status = sub_data.get('status', 'active')
+    sub.status = status if status in ('active', 'past_due', 'canceled', 'trialing') else 'active'
+    sub.cancel_at_period_end = sub_data.get('cancel_at_period_end', False)
+
+    period_end = sub_data.get('current_period_end')
+    if period_end:
+        sub.current_period_end = datetime.fromtimestamp(period_end, tz=timezone.utc)
+
+    db.session.commit()
+
+
+def _handle_subscription_deleted(sub_data):
+    """Downgrade user to free when subscription is canceled."""
+    from models import Subscription
+    stripe_sub_id = sub_data.get('id')
+    sub = Subscription.query.filter_by(stripe_subscription_id=stripe_sub_id).first()
+    if not sub:
+        return
+
+    sub.plan = 'free'
+    sub.status = 'canceled'
+    sub.stripe_subscription_id = None
+    sub.stripe_price_id = None
+    sub.max_team_members = 2
+    sub.max_active_jobs = 5
+    db.session.commit()
+
+
+def _handle_payment_failed(invoice_data):
+    """Mark subscription as past_due on failed payment."""
+    from models import Subscription
+    stripe_sub_id = invoice_data.get('subscription')
+    if not stripe_sub_id:
+        return
+    sub = Subscription.query.filter_by(stripe_subscription_id=stripe_sub_id).first()
+    if sub:
+        sub.status = 'past_due'
+        db.session.commit()
+
+
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "healthy", "service": "CleanEstimate"})
 
 @app.errorhandler(413)
 def too_large(e):

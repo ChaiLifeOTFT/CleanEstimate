@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
     <title>Drake's Precision Cleaning App</title>
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -85,9 +90,13 @@
                 </div>
                 <p class="lead text-muted mt-3">Professional Job Time Estimation & Task Management</p>
                 <div class="mt-3">
-                    <a href="{{ url_for('performance') }}" class="btn btn-outline-primary">
+                    <a href="{{ url_for('performance') }}" class="btn btn-outline-primary me-2">
                         <i class="fas fa-chart-line me-2"></i>
-                        View Performance Dashboard
+                        Performance Dashboard
+                    </a>
+                    <a href="{{ url_for('pricing') }}" class="btn btn-primary">
+                        <i class="fas fa-rocket me-2"></i>
+                        View Pricing
                     </a>
                 </div>
             </div>
@@ -532,5 +541,10 @@
         });
 
     </script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js');
+}
+</script>
 </body>
 </html>
