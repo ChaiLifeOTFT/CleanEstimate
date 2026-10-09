@@ -20,20 +20,17 @@ def client():
 
 def test_webhook_fails_closed_when_secret_is_unconfigured(client, monkeypatch):
     monkeypatch.setattr(cleanestimate, "STRIPE_WEBHOOK_SECRET", "")
-    construct_event = pytest.MonkeyPatch()
-    construct_event.setattr(
+    monkeypatch.setattr(
         cleanestimate.stripe.Webhook,
         "construct_event",
         staticmethod(lambda *args: pytest.fail("must not parse an unsigned event")),
     )
-    try:
-        response = client.post(
-            "/stripe/webhook",
-            data=b'{"type":"checkout.session.completed","data":{"object":{}}}',
-            content_type="application/json",
-        )
-    finally:
-        construct_event.undo()
+
+    response = client.post(
+        "/stripe/webhook",
+        data=b'{"type":"checkout.session.completed","data":{"object":{}}}',
+        content_type="application/json",
+    )
 
     assert response.status_code == 503
     assert response.get_json()["error"] == "Webhook endpoint is not configured"
