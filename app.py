@@ -2003,18 +2003,30 @@ def billing_portal():
 @app.route('/stripe/webhook', methods=['POST'])
 @csrf.exempt
 def stripe_webhook():
-    """Handle Stripe webhook events."""
-    payload = request.get_data(as_text=True)
-    sig_header = request.headers.get('Stripe-Signature')
+    """Handle Stripe webhook events; only process signed events."""
+    # Fail closed if deployment configuration is incomplete. A 5xx response
+    # allows Stripe to retry after configuration is corrected; raw JSON is
+    # never trusted as a fallback.
+    if not STRIPE_WEBHOOK_SECRET:
+        app.logger.error("Stripe webhook rejected: STRIPE_WEBHOOK_SECRET is not configured")
+        return jsonify({'error': 'Webhook endpoint is not configured'}), 503
 
-    if STRIPE_WEBHOOK_SECRET and sig_header:
-        try:
-            event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-        except (ValueError, stripe.SignatureVerificationError) as e:
-            app.logger.error(f"Webhook signature failed: {e}")
-            return jsonify({'error': 'Invalid signature'}), 400
-    else:
-        event = json.loads(payload)
+    sig_header = request.headers.get('Stripe-Signature')
+    if not sig_header:
+        app.logger.warning("Stripe webhook rejected: missing Stripe-Signature header")
+        return jsonify({'error': 'Missing Stripe-Signature header'}), 400
+
+    payload = request.get_data(cache=False)
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, STRIPE_WEBHOOK_SECRET
+        )
+    except ValueError:
+        app.logger.warning("Stripe webhook rejected: invalid payload")
+        return jsonify({'error': 'Invalid payload'}), 400
+    except stripe.SignatureVerificationError:
+        app.logger.warning("Stripe webhook rejected: invalid signature")
+        return jsonify({'error': 'Invalid signature'}), 400
 
     event_type = event.get('type', '')
     data = event.get('data', {}).get('object', {})
